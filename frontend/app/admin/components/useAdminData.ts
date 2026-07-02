@@ -35,9 +35,7 @@ export interface Stats {
   checkedIn: number;
   today: number;
   distinctCheckedIn: number;
-  noShow: number;
-  consentYes: number;
-  consentRate: number; // 0..1
+  notCheckedIn: number;
 }
 
 export interface PersonPatch {
@@ -187,7 +185,7 @@ export function useAdminData(): AdminData {
           body: JSON.stringify(patch),
         });
         if (!res.ok) return false;
-        // Refresh people (for updated_at) + stats (consent could change).
+        // Refresh people (for updated_at) + stats (check-in counts could change).
         await Promise.all([refreshPeople(), refreshStats()]);
         return true;
       } catch {

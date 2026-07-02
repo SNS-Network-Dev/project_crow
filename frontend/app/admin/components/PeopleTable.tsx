@@ -1,8 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { Checkin, Person } from "./useAdminData";
-import { downloadCSV, toCSV, type CsvColumn } from "./csvExport";
 import styles from "./admin.module.css";
 
 const DASH = "—";
@@ -17,27 +16,15 @@ function initials(name: string): string {
 interface Props {
   people: Person[];
   checkins: Checkin[];
+  search: string;
   onSelect: (id: number) => void;
 }
 
-type ConsentFilter = "all" | "yes" | "no";
+const PAGE_SIZE_OPTIONS = ["10", "20", "50", "100", "200", "all"];
 
-export default function PeopleTable({ people, checkins, onSelect }: Props) {
-  const [search, setSearch] = useState("");
-  const [companyFilter, setCompanyFilter] = useState("");
-  const [invitedByFilter, setInvitedByFilter] = useState("");
-  const [consentFilter, setConsentFilter] = useState<ConsentFilter>("all");
-
-  // Distinct filter option lists.
-  const companies = useMemo(
-    () =>
-      Array.from(new Set(people.map((p) => p.full_company_name).filter(Boolean))) as string[],
-    [people],
-  );
-  const inviters = useMemo(
-    () => Array.from(new Set(people.map((p) => p.invited_by).filter(Boolean))) as string[],
-    [people],
-  );
+export default function PeopleTable({ people, checkins, search, onSelect }: Props) {
+  const [pageSize, setPageSize] = useState<string>("10");
+  const [page, setPage] = useState(1);
 
   // Per-person check-in count from the loaded check-ins (capped at the table's
   // limit — the drawer fetches the full history separately).
@@ -49,103 +36,27 @@ export default function PeopleTable({ people, checkins, onSelect }: Props) {
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
+    if (!q) return people;
     return people.filter((p) => {
-      if (q) {
-        const hay = `${p.name} ${p.email ?? ""} ${p.full_company_name ?? ""}`.toLowerCase();
-        if (!hay.includes(q)) return false;
-      }
-      if (companyFilter && p.full_company_name !== companyFilter) return false;
-      if (invitedByFilter && p.invited_by !== invitedByFilter) return false;
-      if (consentFilter === "yes" && !p.consent_at) return false;
-      if (consentFilter === "no" && p.consent_at) return false;
-      return true;
+      const hay = `${p.name} ${p.email ?? ""} ${p.full_company_name ?? ""}`.toLowerCase();
+      return hay.includes(q);
     });
-  }, [people, search, companyFilter, invitedByFilter, consentFilter]);
+  }, [people, search]);
 
-  const hasFilters = search || companyFilter || invitedByFilter || consentFilter !== "all";
-  const clearFilters = () => {
-    setSearch("");
-    setCompanyFilter("");
-    setInvitedByFilter("");
-    setConsentFilter("all");
-  };
+  // Reset to the first page whenever the result set or page size changes —
+  // otherwise a stale page index can land past the last page after filtering.
+  useEffect(() => {
+    setPage(1);
+  }, [search, pageSize]);
 
-  const exportPeopleCsv = () => {
-    const columns: CsvColumn<Person>[] = [
-      { key: "name", header: "Name" },
-      { key: "contact_number", header: "Contact Number" },
-      { key: "email", header: "Personal Email" },
-      { key: "company_email", header: "Company Email" },
-      { key: "full_company_name", header: "Company" },
-      { key: "designation", header: "Designation" },
-      { key: "invited_by", header: "Invited By" },
-      { key: "remarks", header: "Remarks" },
-      { key: "consent_at", header: "Consent At", fmt: (r) => (r.consent_at ? new Date(r.consent_at).toLocaleString() : "no") },
-      { key: "updated_at", header: "Last Modified", fmt: (r) => (r.updated_at ? new Date(r.updated_at).toLocaleString() : "") },
-    ];
-    downloadCSV("project-crow-people.csv", toCSV(filtered, columns));
-  };
+  const size = pageSize === "all" ? Infinity : Number(pageSize);
+  const totalPages = size === Infinity ? 1 : Math.max(1, Math.ceil(filtered.length / size));
+  const safePage = Math.min(Math.max(1, page), totalPages);
+  const start = size === Infinity ? 0 : (safePage - 1) * size;
+  const paged = size === Infinity ? filtered : filtered.slice(start, start + size);
 
   return (
     <div>
-      <div className={styles.toolbar}>
-        <input
-          className={styles.searchInput}
-          type="text"
-          placeholder="Search name, email, company…"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-        />
-        <select
-          className={styles.select}
-          value={companyFilter}
-          onChange={(e) => setCompanyFilter(e.target.value)}
-          aria-label="Filter by company"
-        >
-          <option value="">All companies</option>
-          {companies.map((c) => (
-            <option key={c} value={c}>
-              {c}
-            </option>
-          ))}
-        </select>
-        <select
-          className={styles.select}
-          value={invitedByFilter}
-          onChange={(e) => setInvitedByFilter(e.target.value)}
-          aria-label="Filter by invited by"
-        >
-          <option value="">All inviters</option>
-          {inviters.map((c) => (
-            <option key={c} value={c}>
-              {c}
-            </option>
-          ))}
-        </select>
-        <select
-          className={styles.select}
-          value={consentFilter}
-          onChange={(e) => setConsentFilter(e.target.value as ConsentFilter)}
-          aria-label="Filter by consent"
-        >
-          <option value="all">Any consent</option>
-          <option value="yes">Consented</option>
-          <option value="no">No consent</option>
-        </select>
-        {hasFilters && (
-          <button className={`btn btn--ghost btn--sm ${styles.clearBtn}`} onClick={clearFilters}>
-            Clear
-          </button>
-        )}
-        <button className={`btn btn--ghost btn--sm ${styles.exportBtn}`} onClick={exportPeopleCsv}>
-          Export CSV
-        </button>
-      </div>
-
-      <p className={styles.resultCount}>
-        {filtered.length} of {people.length} guests
-      </p>
-
       <div className="admin-table-wrapper">
         <table className={`admin-table ${styles.adminTable}`}>
           <thead>
@@ -156,23 +67,24 @@ export default function PeopleTable({ people, checkins, onSelect }: Props) {
               <th className={styles.colCompany}>Company</th>
               <th className={styles.colDesignation}>Designation</th>
               <th className={styles.colInvited}>Invited By</th>
-              <th className="td-consent">Consent</th>
-              <th className={styles.colCount}>Check-ins</th>
+              <th className={styles.colRemarks}>Remarks</th>
+              <th className="td-consent">Checked in</th>
             </tr>
           </thead>
           <tbody>
             {filtered.length === 0 && (
               <tr>
                 <td colSpan={8} className={styles.emptyRow}>
-                  No guests match these filters.
+                  No guests match this search.
                 </td>
               </tr>
             )}
-            {filtered.map((p, i) => {
+            {paged.map((p, i) => {
               const count = checkinCount.get(p.id) ?? 0;
+              const checkedIn = count > 0;
               return (
                 <tr key={p.id} className={styles.row} onClick={() => onSelect(p.id)}>
-                  <td className="td-no">{i + 1}</td>
+                  <td className="td-no">{start + i + 1}</td>
                   <td className="td-photo">
                     {p.photo_url ? (
                       // eslint-disable-next-line @next/next/no-img-element
@@ -185,25 +97,70 @@ export default function PeopleTable({ people, checkins, onSelect }: Props) {
                   <td className={styles.colCompany}>{p.full_company_name ?? DASH}</td>
                   <td className={styles.colDesignation}>{p.designation ?? DASH}</td>
                   <td className={styles.colInvited}>{p.invited_by ?? DASH}</td>
+                  <td className={styles.colRemarks} title={p.remarks ?? undefined}>
+                    {p.remarks ?? DASH}
+                  </td>
                   <td className="td-consent">
-                    {p.consent_at ? (
-                      <span className="consent-ok" title={new Date(p.consent_at).toLocaleString()}>
-                        Yes
-                      </span>
+                    {checkedIn ? (
+                      <span className="consent-ok">Yes</span>
                     ) : (
                       <span className="consent-no">{DASH}</span>
                     )}
-                  </td>
-                  <td className={styles.colCount}>
-                    <span className={styles.checkinCount} data-zero={count === 0 || undefined}>
-                      {count}
-                    </span>
                   </td>
                 </tr>
               );
             })}
           </tbody>
         </table>
+      </div>
+
+      <div className={styles.tableFooter}>
+        <div className={styles.pageSizeWrap}>
+          <label htmlFor="crow-page-size" className={styles.pageSizeLabel}>
+            Show
+          </label>
+          <select
+            id="crow-page-size"
+            className={styles.select}
+            value={pageSize}
+            onChange={(e) => setPageSize(e.target.value)}
+          >
+            {PAGE_SIZE_OPTIONS.map((opt) => (
+              <option key={opt} value={opt}>
+                {opt === "all" ? "ALL" : opt}
+              </option>
+            ))}
+          </select>
+          <span>per page</span>
+        </div>
+
+        <div className={styles.resultCount}>
+          {filtered.length} of {people.length} guests
+        </div>
+
+        {totalPages > 1 && (
+          <div className={styles.pager}>
+            <button
+              type="button"
+              className="btn btn--ghost btn--sm"
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+              disabled={safePage <= 1}
+            >
+              Prev
+            </button>
+            <span className={styles.pagerInfo}>
+              Page {safePage} of {totalPages}
+            </span>
+            <button
+              type="button"
+              className="btn btn--ghost btn--sm"
+              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+              disabled={safePage >= totalPages}
+            >
+              Next
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );

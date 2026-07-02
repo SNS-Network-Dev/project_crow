@@ -182,6 +182,22 @@ export async function logCheckin(personId: number, score: number): Promise<numbe
   return res.insertId;
 }
 
+// Most recent check-in for one person, or null if they've never checked in.
+// Used by /api/confirm to enforce one check-in per person — a second attempt
+// is reported back to the kiosk as "already checked in" instead of inserting.
+export async function latestCheckinForPerson(personId: number): Promise<CheckinRow | null> {
+  const [rows] = await pool.query<CheckinRow[]>(
+    `SELECT c.id, c.person_id, p.name, c.score, c.checked_in_at
+       FROM project_crow_checkins c
+       JOIN project_crow_people p ON p.id = c.person_id
+      WHERE c.person_id = ?
+      ORDER BY c.checked_in_at DESC
+      LIMIT 1`,
+    [personId]
+  );
+  return rows[0] ?? null;
+}
+
 export async function recentCheckins(limit = 50): Promise<CheckinRow[]> {
   const safeLimit = Math.min(Math.max(Math.trunc(limit) || 0, 1), 500);
   const [rows] = await pool.query<CheckinRow[]>(
@@ -222,13 +238,6 @@ export async function countCheckinsToday(): Promise<number> {
 export async function distinctCheckedInPersonCount(): Promise<number> {
   const [rows] = await pool.query<RowDataPacket[]>(
     `SELECT COUNT(DISTINCT person_id) AS c FROM project_crow_checkins`
-  );
-  return Number(rows[0].c);
-}
-
-export async function countConsent(): Promise<number> {
-  const [rows] = await pool.query<RowDataPacket[]>(
-    `SELECT COUNT(*) AS c FROM project_crow_people WHERE consent_at IS NOT NULL`
   );
   return Number(rows[0].c);
 }

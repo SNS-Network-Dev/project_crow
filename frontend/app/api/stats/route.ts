@@ -4,20 +4,20 @@ import {
   countCheckins,
   countCheckinsToday,
   distinctCheckedInPersonCount,
-  countConsent,
 } from "@/lib/db";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-// Admin dashboard overview. One round-trip, five cheap count queries.
+// Admin dashboard overview. One round-trip, four cheap count queries.
+// With one-check-in-per-person, total check-ins == distinct people checked in,
+// so "Checked in" uses distinctCheckedIn and "Not checked in" is registered − that.
 export async function GET() {
-  const [registered, checkedIn, today, distinctCheckedIn, consentYes] = await Promise.all([
+  const [registered, checkedIn, today, distinctCheckedIn] = await Promise.all([
     countPeople(),
     countCheckins(),
     countCheckinsToday(),
     distinctCheckedInPersonCount(),
-    countConsent(),
   ]);
 
   return NextResponse.json({
@@ -25,8 +25,6 @@ export async function GET() {
     checkedIn,
     today,
     distinctCheckedIn,
-    noShow: Math.max(0, registered - distinctCheckedIn),
-    consentYes,
-    consentRate: registered > 0 ? consentYes / registered : 0,
+    notCheckedIn: Math.max(0, registered - distinctCheckedIn),
   });
 }

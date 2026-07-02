@@ -24,15 +24,17 @@ export default function StatsBar({ stats, loading }: Props) {
   }
   if (!stats) return null;
 
-  const pct = (n: number) => `${Math.round(n * 100)}%`;
-
   return (
     <div className={styles.statsBar}>
       <Stat label="Registered" value={String(stats.registered)} />
-      <Stat label="Checked in" value={String(stats.checkedIn)} hint={`${stats.distinctCheckedIn} unique guests`} accent />
+      <Stat
+        label="Checked in"
+        value={String(stats.checkedIn)}
+        hint={`${stats.distinctCheckedIn} unique guests`}
+        accent
+      />
       <Stat label="Today" value={String(stats.today)} />
-      <Stat label="No-show" value={String(stats.noShow)} hint="registered − checked-in" />
-      <Stat label="Consent" value={pct(stats.consentRate)} hint={`${stats.consentYes} of ${stats.registered}`} />
+      <Stat label="Not checked in" value={String(stats.notCheckedIn)} hint="registered − checked-in" />
     </div>
   );
 }

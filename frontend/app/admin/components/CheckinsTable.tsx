@@ -1,52 +1,27 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import type { Checkin } from "./useAdminData";
-import { downloadCSV, toCSV, type CsvColumn } from "./csvExport";
 import styles from "./admin.module.css";
 
 interface Props {
   checkins: Checkin[];
+  search: string;
 }
 
-export default function CheckinsTable({ checkins }: Props) {
-  const [search, setSearch] = useState("");
-
+export default function CheckinsTable({ checkins, search }: Props) {
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     if (!q) return checkins;
     return checkins.filter((c) => c.name.toLowerCase().includes(q));
   }, [checkins, search]);
 
-  const exportCheckinsCsv = () => {
-    const columns: CsvColumn<Checkin>[] = [
-      { key: "checked_in_at", header: "When", fmt: (r) => new Date(r.checked_in_at).toLocaleString() },
-      { key: "name", header: "Name" },
-      { key: "score", header: "Match", fmt: (r) => (r.score > 0 ? `${(r.score * 100).toFixed(0)}%` : "manual") },
-    ];
-    downloadCSV("project-crow-checkins.csv", toCSV(filtered, columns));
-  };
-
   return (
     <div>
       <div className={styles.toolbar}>
-        <input
-          className={styles.searchInput}
-          type="text"
-          placeholder="Search by name…"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-        />
         <span className={styles.liveDot} title="Auto-refreshes every 10s" />
         <span className={styles.liveLabel}>Live</span>
-        <button className={`btn btn--ghost btn--sm ${styles.exportBtn}`} onClick={exportCheckinsCsv}>
-          Export CSV
-        </button>
       </div>
-
-      <p className={styles.resultCount}>
-        {filtered.length} of {checkins.length} recent check-ins
-      </p>
 
       <div className="panel" style={{ padding: 0, overflow: "hidden" }}>
         {filtered.length === 0 ? (
@@ -76,6 +51,10 @@ export default function CheckinsTable({ checkins }: Props) {
           </div>
         )}
       </div>
+
+      <p className={styles.resultCount} style={{ marginTop: 12 }}>
+        {filtered.length} of {checkins.length} recent check-ins
+      </p>
     </div>
   );
 }

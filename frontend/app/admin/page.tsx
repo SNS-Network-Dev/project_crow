@@ -2,7 +2,6 @@
 
 import { useCallback, useState } from "react";
 import { useAdminData } from "./components/useAdminData";
-import StatsBar from "./components/StatsBar";
 import PeopleTable from "./components/PeopleTable";
 import PersonDrawer from "./components/PersonDrawer";
 import CheckinsTable from "./components/CheckinsTable";
@@ -12,6 +11,7 @@ type Tab = "people" | "checkins";
 export default function AdminPage() {
   const data = useAdminData();
   const [tab, setTab] = useState<Tab>("people");
+  const [search, setSearch] = useState("");
   const [selectedId, setSelectedId] = useState<number | null>(null);
 
   const selectedPerson = selectedId != null ? data.people.find((p) => p.id === selectedId) ?? null : null;
@@ -35,22 +35,33 @@ export default function AdminPage() {
 
       {data.error && <div className="notice notice--error">{data.error}</div>}
 
-      <StatsBar stats={data.stats} loading={data.loading} />
-
       <div className="tab-bar">
         <button className={tab === "people" ? "tab tab--active" : "tab"} onClick={() => setTab("people")}>
-          People ({data.people.length})
+          Registered ({data.people.length})
         </button>
         <button className={tab === "checkins" ? "tab tab--active" : "tab"} onClick={() => setTab("checkins")}>
-          Check-ins ({data.checkins.length})
+          Checked in ({data.checkins.length})
         </button>
+        <input
+          className="tabSearch"
+          type="text"
+          placeholder={tab === "people" ? "Search name, email, company…" : "Search by name…"}
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          aria-label="Search"
+        />
       </div>
 
       {tab === "people" && (
-        <PeopleTable people={data.people} checkins={data.checkins} onSelect={openDrawer} />
+        <PeopleTable
+          people={data.people}
+          checkins={data.checkins}
+          search={search}
+          onSelect={openDrawer}
+        />
       )}
 
-      {tab === "checkins" && <CheckinsTable checkins={data.checkins} />}
+      {tab === "checkins" && <CheckinsTable checkins={data.checkins} search={search} />}
 
       <PersonDrawer
         person={selectedPerson}

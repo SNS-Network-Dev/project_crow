@@ -25,7 +25,7 @@ interface Person {
   photo_url: string | null;
 }
 
-type Phase = "live" | "matching" | "results" | "done";
+type Phase = "live" | "matching" | "results" | "done" | "already";
 type CamError = "insecure" | "denied" | "notfound" | "other" | null;
 type RingState = "search" | "detect" | "aligned";
 
@@ -66,6 +66,7 @@ export default function CheckinKiosk() {
   });
   const [candidates, setCandidates] = useState<Candidate[] | null>(null);
   const [doneName, setDoneName] = useState<string | null>(null);
+  const [alreadyInfo, setAlreadyInfo] = useState<{ name: string; checked_in_at: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [manual, setManual] = useState(false);
   const [people, setPeople] = useState<Person[]>([]);
@@ -83,6 +84,7 @@ export default function CheckinKiosk() {
     setManual(false);
     setError(null);
     setDoneName(null);
+    setAlreadyInfo(null);
     setRing({ state: "search", hint: "Position your face in the circle", count: 0 });
     setPhase("live");
   }, []);
@@ -278,9 +280,29 @@ export default function CheckinKiosk() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ person_id: personId, score }),
         });
+        const b = (await res.json().catch(() => ({}))) as {
+          ok?: boolean;
+          alreadyCheckedIn?: boolean;
+          name?: string;
+          checked_in_at?: string;
+          error?: string;
+        };
         if (!res.ok) {
-          const b = await res.json().catch(() => ({}));
           setError(b.error ?? "Could not record check-in.");
+          return;
+        }
+        // One check-in per person: server reports a prior check-in instead of
+        // recording a duplicate. Notify the operator and return to live.
+        if (b.alreadyCheckedIn) {
+          setAlreadyInfo({
+            name: b.name ?? name,
+            checked_in_at: b.checked_in_at ?? "",
+          });
+          setCandidates(null);
+          setManual(false);
+          setPhase("already");
+          phaseRef.current = "already";
+          window.setTimeout(backToLive, DONE_RESET_MS);
           return;
         }
         setDoneName(name);
@@ -457,6 +479,27 @@ export default function CheckinKiosk() {
             <h1>Welcome, {doneName}!</h1>
             <p className="subtitle">You&apos;re checked in.</p>
             <button className="btn btn--lg btn--block" onClick={backToLive}>
+              Next guest
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ---- already checked in ---- */}
+      {phase === "already" && alreadyInfo && (
+        <div className="kiosk-overlay kiosk-overlay--center">
+          <div className="kiosk-card kiosk-card--warn" style={{ textAlign: "center" }}>
+            <h1>{alreadyInfo.name}</h1>
+            <p className="subtitle">
+              Already checked in
+              {alreadyInfo.checked_in_at
+                ? ` · ${new Date(alreadyInfo.checked_in_at).toLocaleString()}`
+                : ""}
+            </p>
+            <p className="muted" style={{ marginTop: 6 }}>
+              Each guest can only check in once.
+            </p>
+            <button className="btn btn--lg btn--block" onClick={backToLive} style={{ marginTop: 12 }}>
               Next guest
             </button>
           </div>

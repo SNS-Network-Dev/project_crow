@@ -12,3 +12,7 @@ yarn-error.log*
 next-env.d.ts
 *.tsbuildinfo
 .vercel
+
+# local tooling / dev server logs
+.claude/
+dev.log

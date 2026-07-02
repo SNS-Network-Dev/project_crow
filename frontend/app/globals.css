@@ -409,6 +409,33 @@ th {
   border-color: var(--accent);
 }
 
+/* Search input that shares the tab row (sits right-aligned with the tabs). */
+.tabSearch {
+  margin-left: auto;
+  align-self: center;
+  flex: 0 1 280px;
+  min-width: 180px;
+  padding: 8px 14px;
+  font-size: 0.9rem;
+  color: var(--text);
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  transition: border-color 0.15s;
+}
+
+.tabSearch:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+@media (max-width: 720px) {
+  .tabSearch {
+    flex-basis: 100%;
+    margin: 6px 0 0;
+  }
+}
+
 /* ---- admin table ---- */
 
 .admin-table-wrapper {
@@ -722,6 +749,11 @@ th {
   border-color: var(--accent-strong);
   text-align: center;
 }
+.kiosk-card--warn {
+  border-color: #d97706;
+  background: #fffbeb;
+  text-align: center;
+}
 .kiosk-check {
   width: clamp(64px, 16vmin, 108px);
   height: clamp(64px, 16vmin, 108px);
@@ -780,7 +812,7 @@ th {
   margin-top: 14px;
 }
 
-/* ===== App shell: sidebar + full-width main ===== */
+/* ===== App shell: sidebar + full-width main (mirrors aimy_chat company_admin sidebar) ===== */
 
 .appShell {
   display: flex;
@@ -789,63 +821,88 @@ th {
 }
 
 .sidebar {
-  flex: 0 0 240px;
-  width: 240px;
-  background: var(--panel-2);
+  flex: 0 0 16rem;
+  width: 16rem;
+  background: linear-gradient(to bottom, #ffffff, #f9fafb);
   border-right: 1px solid var(--border);
-  padding: 14px 12px 16px;
+  box-shadow: 4px 0 24px rgba(0, 0, 0, 0.05);
+  display: flex;
+  flex-direction: column;
   position: sticky;
   top: 0;
   height: 100vh;
-  overflow-y: auto;
-  overflow-x: hidden;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
+  overflow: hidden;
   transition: width 200ms ease, flex-basis 200ms ease;
+  z-index: 30;
 }
 
 .sidebar--collapsed {
-  flex-basis: 72px;
-  width: 72px;
+  flex-basis: 4rem;
+  width: 4rem;
+}
+
+/* `.sidebar-text` is anything that should vanish when the rail is collapsed. */
+.sidebar--collapsed .sidebar-text {
+  display: none;
+}
+.sidebar--collapsed .sidebarNavList .navItem,
+.sidebar--collapsed .sidebarAccountTrigger {
+  justify-content: center;
+}
+.sidebar--collapsed .sidebarHead {
+  justify-content: center;
+}
+.sidebar--collapsed .sidebarBrand {
+  display: none;
+}
+/* Collapsed head keeps the brand mark + hamburger; give the nav a little extra
+   top breathing room like aimy does. */
+.sidebar--collapsed .sidebarNav {
+  padding-top: 16px;
 }
 
 .sidebarHead {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 6px;
-  padding: 2px 4px 12px;
+  gap: 8px;
+  padding: 16px;
+  border-bottom: 1px solid var(--border);
 }
 
 .sidebarBrand {
-  flex: 1 1 auto;
+  display: flex;
+  align-items: center;
+  gap: 10px;
   min-width: 0;
-  font-size: 1.02rem;
-  font-weight: 800;
-  letter-spacing: -0.01em;
   color: var(--text);
+  font-weight: 700;
   white-space: nowrap;
-  overflow: hidden;
 }
 
-.sidebarBrandMono {
-  display: none;
+.sidebarBrandMark {
+  flex: 0 0 auto;
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: #0d9488;
+  color: #fff;
+  font-size: 0.8rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
 }
 
-.sidebar--collapsed .sidebarBrandFull {
-  display: none;
-}
-
-.sidebar--collapsed .sidebarBrandMono {
-  display: inline;
-  font-size: 1.02rem;
+.sidebarBrandName {
+  font-size: 1rem;
 }
 
 .sidebarToggle {
   flex: 0 0 auto;
-  width: 28px;
-  height: 28px;
+  width: 34px;
+  height: 34px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -858,26 +915,18 @@ th {
 }
 
 .sidebarToggle:hover {
-  background: var(--panel);
+  background: var(--panel-2);
   color: var(--text);
 }
 
-/* Pure-CSS chevron (no glyph): two borders rotated. Points left = collapse,
-   points right = expand. */
-.chevron {
-  width: 9px;
-  height: 9px;
-  border-right: 2px solid currentColor;
-  border-bottom: 2px solid currentColor;
-  transform: rotate(135deg);
-  transition: transform 200ms ease;
-}
-
-.chevron[data-collapsed] {
-  transform: rotate(-45deg);
-}
-
 .sidebarNav {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 12px 12px 16px;
+}
+
+.sidebarNavList {
   display: flex;
   flex-direction: column;
   gap: 4px;
@@ -887,59 +936,187 @@ th {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 10px 12px;
+  padding: 8px 12px;
   border-radius: 10px;
-  color: var(--text);
-  font-weight: 600;
-  font-size: 0.95rem;
+  color: var(--muted);
+  font-size: 0.9rem;
+  font-weight: 500;
   white-space: nowrap;
   transition: background 0.12s, color 0.12s;
 }
 
 .navItem:hover {
-  background: var(--panel);
+  color: #0d9488;
+  background: rgba(13, 148, 136, 0.06);
 }
 
 .navItem--active {
-  background: var(--accent);
-  color: #fff;
+  background: rgba(13, 148, 136, 0.12);
+  color: #0d9488;
+  font-weight: 600;
 }
 
 .navItem--active:hover {
-  background: var(--accent);
+  background: rgba(13, 148, 136, 0.16);
+  color: #0d9488;
 }
 
-.navMono {
-  display: none;
-}
-
-.sidebar--collapsed .navItem {
-  justify-content: center;
-  padding: 10px 0;
-}
-
-.sidebar--collapsed .navLabel {
-  display: none;
-}
-
-.sidebar--collapsed .navMono {
+.navIcon {
+  flex: 0 0 16px;
+  width: 16px;
+  height: 16px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 34px;
-  height: 26px;
-  padding: 0 6px;
-  border-radius: 7px;
-  font-size: 0.72rem;
-  font-weight: 700;
-  letter-spacing: 0.04em;
+}
+
+.navLabel {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ---- account trigger + upward dropdown (sticky bottom) ---- */
+
+.sidebarBottom {
+  margin-top: auto;
+  padding: 12px;
+  border-top: 1px solid var(--border);
+  position: relative;
+}
+
+.sidebarAccountMenu {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 12px;
+  right: 12px;
   background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.12);
+  overflow: hidden;
+  z-index: 50;
+  display: none;
+}
+
+.sidebarAccountMenu.open {
+  display: block;
+  animation: accountMenuIn 140ms ease;
+}
+
+@keyframes accountMenuIn {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.sidebarAccountMenuHeader {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border);
+  font-size: 0.75rem;
   color: var(--muted);
 }
 
-.sidebar--collapsed .navItem--active .navMono {
-  background: rgba(255, 255, 255, 0.18);
+.accountItem {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 9px 12px;
+  background: transparent;
+  border: none;
+  font: inherit;
+  font-size: 0.88rem;
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.12s;
+  text-decoration: none;
+}
+
+.accountItem:hover {
+  background: var(--panel-2);
+}
+
+.accountItem--danger {
+  color: #e02424;
+}
+
+.accountItem--danger:hover {
+  background: #fef2f3;
+}
+
+.sidebarAccountTrigger {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 8px;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  background: transparent;
+  cursor: pointer;
+  transition: background 0.12s;
+  font: inherit;
+  text-align: left;
+  color: var(--text);
+}
+
+.sidebarAccountTrigger:hover {
+  background: var(--panel-2);
+}
+
+.accountAvatar {
+  flex: 0 0 32px;
+  width: 32px;
+  height: 32px;
+  border-radius: 999px;
+  background: #0d9488;
   color: #fff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.accountMeta {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.accountName {
+  display: block;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.accountSub {
+  display: block;
+  font-size: 0.72rem;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.accountChevron {
+  flex: 0 0 auto;
+  color: var(--muted);
+  transition: transform 0.18s ease;
+}
+
+.sidebarBottom--open .accountChevron {
+  transform: rotate(180deg);
 }
 
 .appMain {
@@ -947,9 +1124,16 @@ th {
   min-width: 0;
 }
 
+/* On desktop the account dropdown holds Log out; the mobile-only row item below
+   stays hidden until the sidebar collapses to a top bar. */
+.navItem--mobileLogout {
+  display: none;
+}
+
 /* Mobile: sidebar becomes a top bar (collapse toggle is hidden — not useful in
    the horizontal layout). Camera pages (position:fixed .kiosk-stage) still cover
-   it full-screen. */
+   it full-screen. The account dropdown is hidden on mobile; Log out becomes a
+   normal row item instead. */
 @media (max-width: 720px) {
   .appShell {
     flex-direction: column;
@@ -963,36 +1147,162 @@ th {
     flex-direction: column;
     border-right: none;
     border-bottom: 1px solid var(--border);
-    padding: 10px 12px;
+    box-shadow: none;
+    background: var(--panel);
+    padding: 0;
   }
   .sidebarHead {
-    padding: 0 0 8px;
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--border);
   }
   .sidebarToggle {
     display: none;
   }
-  .sidebar--collapsed .sidebarBrandFull {
+  .sidebar--collapsed .sidebarBrandName {
     display: inline;
   }
-  .sidebar--collapsed .sidebarBrandMono {
-    display: none;
-  }
   .sidebarNav {
+    padding: 8px 12px;
+    overflow: visible;
+  }
+  .sidebarNavList {
     flex-direction: row;
     flex-wrap: wrap;
     gap: 6px;
   }
   .navItem {
-    padding: 8px 10px;
+    padding: 7px 10px;
   }
   .sidebar--collapsed .navItem {
     justify-content: flex-start;
-    padding: 8px 10px;
   }
-  .sidebar--collapsed .navLabel {
+  .sidebar--collapsed .sidebar-text {
     display: inline;
   }
-  .sidebar--collapsed .navMono {
+  .sidebarBottom {
     display: none;
   }
+  .navItem--mobileLogout {
+    display: flex;
+  }
+}
+
+/* ---- Admin login page (mirrors aimy_chat security/login_page.php) ---- */
+.loginPage {
+  position: relative;
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  overflow: hidden;
+  background: linear-gradient(135deg, #f8fafc 0%, #eff6ff 100%);
+}
+.loginGrid {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  opacity: 0.5;
+  pointer-events: none;
+  background-image:
+    linear-gradient(to right, #d1d5db 1px, transparent 1px),
+    linear-gradient(to bottom, #d1d5db 1px, transparent 1px);
+  background-size: 40px 40px;
+  mask-image: radial-gradient(ellipse at center, #000 60%, transparent 100%);
+}
+.loginCard {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  max-width: 28rem;
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  border-radius: 14px;
+  padding: 32px;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+  animation: loginFadeIn 0.6s ease-out;
+}
+@keyframes loginFadeIn {
+  from { opacity: 0; transform: translateY(20px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.loginLogo {
+  width: 48px;
+  height: 48px;
+  margin: 0 auto 20px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+  font-size: 1.1rem;
+  letter-spacing: 0.04em;
+  color: #fff;
+  background: var(--accent);
+  box-shadow: 0 6px 16px rgba(37, 99, 235, 0.35);
+}
+.loginTitle {
+  font-size: 1.875rem;
+  font-weight: 800;
+  text-align: center;
+  color: #1f2937;
+  margin-bottom: 6px;
+}
+.loginSubtitle {
+  text-align: center;
+  color: #6b7280;
+  margin-bottom: 28px;
+}
+.loginField {
+  margin-bottom: 18px;
+}
+.loginLabel {
+  display: block;
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: #374151;
+  margin-bottom: 8px;
+}
+.loginInput {
+  width: 100%;
+  padding: 12px 16px;
+  font-size: 1rem;
+  color: #374151;
+  background: #fff;
+  border: 1px solid #d1d5db;
+  border-radius: 10px;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.loginInput:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.25);
+}
+.loginBtn {
+  width: 100%;
+  padding: 12px 16px;
+  margin-top: 6px;
+  background: var(--accent);
+  color: #fff;
+  font-weight: 700;
+  font-size: 1rem;
+  border: none;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.loginBtn:hover:not(:disabled) {
+  background: #1d4ed8;
+}
+.loginBtn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+.loginFoot {
+  text-align: center;
+  color: #6b7280;
+  font-size: 0.875rem;
+  margin-top: 22px;
 }
