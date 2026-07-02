@@ -1,0 +1,53 @@
+{
+  "name": "default",
+  "width": 1280,
+  "height": 717,
+  "background": "bg.png",
+  "figure": {
+    "x": 202,
+    "y": 13,
+    "width": 876,
+    "height": 700,
+    "anchor": "bottom"
+  },
+  "texts": [
+    {
+      "id": "title",
+      "default": "Happy Birthday Mr Kelvin!",
+      "x": 640,
+      "y": 60,
+      "size": 56,
+      "weight": "bold",
+      "color": "#ffffff",
+      "align": "center",
+      "baseline": "middle",
+      "maxWidth": 1120,
+      "shadow": { "color": "rgba(0,0,0,0.8)", "blur": 14, "x": 0, "y": 3 },
+      "stroke": { "color": "rgba(0,0,0,0.55)", "width": 6 }
+    },
+    {
+      "id": "pioneer",
+      "default": "",
+      "x": 640,
+      "y": 700,
+      "size": 28,
+      "weight": "bold",
+      "color": "#ffffff",
+      "align": "center",
+      "baseline": "middle",
+      "maxWidth": 900,
+      "shadow": { "color": "rgba(0,0,0,0.85)", "blur": 10, "x": 0, "y": 2 },
+      "stroke": { "color": "rgba(0,0,0,0.6)", "width": 5 }
+    }
+  ],
+  "logos": [
+    {
+      "id": "sns",
+      "default": "logos/sns-network-logo.png",
+      "x": 40,
+      "y": 600,
+      "width": 210,
+      "align": "left"
+    }
+  ]
+}

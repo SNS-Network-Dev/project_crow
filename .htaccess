@@ -1,0 +1,18 @@
+# project_crow sits inside the Apache docroot (/var/www/html), so without this
+# everything here is web-readable. Deny secrets and source; nothing in this dir is
+# meant to be served statically (the bridge runs as its own service / endpoints).
+
+Options -Indexes
+
+# Block all dotfiles (.env, .env.local, .git, .htaccess itself, ...)
+<FilesMatch "^\.">
+    Require all denied
+</FilesMatch>
+
+# Block env + source/config files by extension, anywhere under here.
+<FilesMatch "\.(env|local|sql|lock|ts|tsx|md|map)$">
+    Require all denied
+</FilesMatch>
+
+# Block internal app directories outright.
+RedirectMatch 403 ^/project_crow/(frontend|db|node_modules|data)(/|$)
