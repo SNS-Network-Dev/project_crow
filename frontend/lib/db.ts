@@ -193,3 +193,57 @@ export async function recentCheckins(limit = 50): Promise<CheckinRow[]> {
   );
   return rows;
 }
+
+// ---------- stats (admin dashboard) ----------
+
+export async function countCheckins(): Promise<number> {
+  const [rows] = await pool.query<RowDataPacket[]>(
+    `SELECT COUNT(*) AS c FROM project_crow_checkins`
+  );
+  return Number(rows[0].c);
+}
+
+export async function countCheckinsSince(date: Date): Promise<number> {
+  const [rows] = await pool.query<RowDataPacket[]>(
+    `SELECT COUNT(*) AS c FROM project_crow_checkins WHERE checked_in_at >= ?`,
+    [date]
+  );
+  return Number(rows[0].c);
+}
+
+// Check-ins since local midnight (server timezone). Used for the "today" stat.
+export async function countCheckinsToday(): Promise<number> {
+  const start = new Date();
+  start.setHours(0, 0, 0, 0);
+  return countCheckinsSince(start);
+}
+
+// Distinct people who have ever checked in — the denominator for no-show.
+export async function distinctCheckedInPersonCount(): Promise<number> {
+  const [rows] = await pool.query<RowDataPacket[]>(
+    `SELECT COUNT(DISTINCT person_id) AS c FROM project_crow_checkins`
+  );
+  return Number(rows[0].c);
+}
+
+export async function countConsent(): Promise<number> {
+  const [rows] = await pool.query<RowDataPacket[]>(
+    `SELECT COUNT(*) AS c FROM project_crow_people WHERE consent_at IS NOT NULL`
+  );
+  return Number(rows[0].c);
+}
+
+// Full check-in history for one person (admin drawer). Same shape as recentCheckins.
+export async function checkinsForPerson(personId: number, limit = 100): Promise<CheckinRow[]> {
+  const safeLimit = Math.min(Math.max(Math.trunc(limit) || 0, 1), 500);
+  const [rows] = await pool.query<CheckinRow[]>(
+    `SELECT c.id, c.person_id, p.name, c.score, c.checked_in_at
+       FROM project_crow_checkins c
+       JOIN project_crow_people p ON p.id = c.person_id
+      WHERE c.person_id = ?
+      ORDER BY c.checked_in_at DESC
+      LIMIT ${safeLimit}`,
+    [personId]
+  );
+  return rows;
+}

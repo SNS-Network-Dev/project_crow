@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { BASE_PATH } from "@/lib/basePath";
 
@@ -233,10 +232,6 @@ export default function RegisterPage() {
           {busy ? "Registering…" : "Register"}
         </button>
       </div>
-
-      <p className="subtitle">
-        <Link href="/">← Home</Link>
-      </p>
     </main>
   );
 }

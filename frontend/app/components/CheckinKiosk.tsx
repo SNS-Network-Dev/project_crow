@@ -29,6 +29,13 @@ type Phase = "live" | "matching" | "results" | "done";
 type CamError = "insecure" | "denied" | "notfound" | "other" | null;
 type RingState = "search" | "detect" | "aligned";
 
+function initials(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return "?";
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+}
+
 // Alignment tuning (normalized to the video frame).
 const CENTER_TOL = 0.17; // how far off-center the face may be
 const MIN_FACE = 0.2; // bbox height fraction — smaller => "come closer"
@@ -326,7 +333,7 @@ export default function CheckinKiosk() {
       <video ref={videoRef} className="kiosk-video" playsInline muted autoPlay />
 
       <Link href="/" className="kiosk-home" aria-label="Home">
-        ✕
+        <span className="kiosk-x" aria-hidden />
       </Link>
 
       {/* ---- start gate (one tap to grant camera + load detector) ---- */}
@@ -403,7 +410,7 @@ export default function CheckinKiosk() {
                           // eslint-disable-next-line @next/next/no-img-element
                           <img src={c.photo_url} alt={c.name} />
                         ) : (
-                          <span className="avatar">👤</span>
+                          <span className="avatar">{initials(c.name)}</span>
                         )}
                         <span className="meta">
                           <span className="name">{c.name}</span>
@@ -444,7 +451,9 @@ export default function CheckinKiosk() {
       {phase === "done" && doneName && (
         <div className="kiosk-overlay kiosk-overlay--center">
           <div className="kiosk-card kiosk-card--ok" style={{ textAlign: "center" }}>
-            <div className="kiosk-check">✅</div>
+            <div className="kiosk-check" aria-hidden>
+              <span className="kiosk-checkmark" />
+            </div>
             <h1>Welcome, {doneName}!</h1>
             <p className="subtitle">You&apos;re checked in.</p>
             <button className="btn btn--lg btn--block" onClick={backToLive}>
@@ -493,7 +502,7 @@ function ManualPicker({
               // eslint-disable-next-line @next/next/no-img-element
               <img src={p.photo_url} alt={p.name} />
             ) : (
-              <span className="avatar">👤</span>
+              <span className="avatar">{initials(p.name)}</span>
             )}
             <span className="meta">
               <span className="name">{p.name}</span>

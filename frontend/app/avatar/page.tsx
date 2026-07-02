@@ -1,4 +1,3 @@
-import Link from "next/link";
 import AvatarStudio from "../components/AvatarStudio";
 
 export default function AvatarPage() {
@@ -10,9 +9,6 @@ export default function AvatarPage() {
         poster.
       </p>
       <AvatarStudio />
-      <p className="subtitle" style={{ marginTop: 18 }}>
-        <Link href="/">← Home</Link>
-      </p>
     </main>
   );
 }
