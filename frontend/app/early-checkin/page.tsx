@@ -1,0 +1,378 @@
+"use client";
+
+import { useCallback, useState } from "react";
+import { BASE_PATH } from "@/lib/basePath";
+import FaceCapture from "../components/FaceCapture";
+
+interface FoundPerson {
+  id: number;
+  name: string;
+  contactNumber: string | null;
+  companyEmail: string | null;
+  fullCompanyName: string | null;
+  designation: string | null;
+  invitedBy: string | null;
+  remarks: string | null;
+  photoUrl: string | null;
+  hasEmbedding: boolean;
+}
+
+type CheckinStep =
+  | "lookup"
+  | "confirm"
+  | "choose"
+  | "matching"
+  | "done"
+  | "already";
+
+interface DoneInfo {
+  name: string;
+  fullCompanyName: string | null;
+  checkedInAt?: string;
+  method: "face" | "manual";
+}
+
+const DASH = "—";
+
+export default function EarlyCheckinPage() {
+  const [step, setStep] = useState<CheckinStep>("lookup");
+  const [name, setName] = useState("");
+  const [companyEmail, setCompanyEmail] = useState("");
+  const [person, setPerson] = useState<FoundPerson | null>(null);
+  const [cameraOpen, setCameraOpen] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [doneInfo, setDoneInfo] = useState<DoneInfo | null>(null);
+
+  const resetAll = useCallback(() => {
+    setStep("lookup");
+    setName("");
+    setCompanyEmail("");
+    setPerson(null);
+    setCameraOpen(false);
+    setBusy(false);
+    setError(null);
+    setDoneInfo(null);
+  }, []);
+
+  const lookup = useCallback(async () => {
+    setError(null);
+    setBusy(true);
+    try {
+      const res = await fetch(`${BASE_PATH}/api/register/lookup`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: name.trim(),
+          companyEmail: companyEmail.trim(),
+        }),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setError(body.error ?? "Lookup failed.");
+        return;
+      }
+      setPerson({
+        ...body,
+        photoUrl: body.photoUrl ?? null,
+        hasEmbedding: body.hasEmbedding ?? false,
+      });
+      setStep("confirm");
+    } catch {
+      setError("Network error. Try again.");
+    } finally {
+      setBusy(false);
+    }
+  }, [name, companyEmail]);
+
+  const recordManualCheckin = useCallback(async () => {
+    if (!person) return;
+    setError(null);
+    setBusy(true);
+    try {
+      const res = await fetch(`${BASE_PATH}/api/early-checkin/manual`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ person_id: person.id }),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setError(body.error ?? "Check-in failed.");
+        setBusy(false);
+        return;
+      }
+      if (body.alreadyCheckedIn) {
+        setDoneInfo({
+          name: body.name,
+          fullCompanyName: body.full_company_name ?? null,
+          checkedInAt: body.checked_in_at,
+          method: "manual",
+        });
+        setStep("already");
+      } else {
+        setDoneInfo({
+          name: body.name,
+          fullCompanyName: body.full_company_name ?? null,
+          checkedInAt: body.checked_in_at,
+          method: "manual",
+        });
+        setStep("done");
+      }
+    } catch {
+      setError("Network error. Try again.");
+    } finally {
+      setBusy(false);
+    }
+  }, [person]);
+
+  const handleFaceCapture = useCallback(
+    async (blob: Blob) => {
+      if (!person) return;
+      setCameraOpen(false);
+      setError(null);
+      setBusy(true);
+      setStep("matching");
+      try {
+        const fd = new FormData();
+        fd.append("frame", blob, "frame.jpg");
+        const res = await fetch(`${BASE_PATH}/api/checkin`, {
+          method: "POST",
+          body: fd,
+        });
+        const body = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          setError(body.error ?? "Face check-in failed.");
+          setStep("choose");
+          setBusy(false);
+          return;
+        }
+        const candidates: {
+          person_id: number;
+          score: number;
+          confident: boolean;
+        }[] = body.candidates ?? [];
+        const match = candidates.find(
+          (c) => c.confident && c.person_id === person.id,
+        );
+        if (!match) {
+          setError(
+            "We couldn't verify your face. Please try again or check in manually.",
+          );
+          setStep("choose");
+          setBusy(false);
+          return;
+        }
+
+        const confirmRes = await fetch(`${BASE_PATH}/api/confirm`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            person_id: person.id,
+            score: match.score,
+          }),
+        });
+        const confirmBody = await confirmRes.json().catch(() => ({}));
+        if (!confirmRes.ok) {
+          setError(confirmBody.error ?? "Could not record check-in.");
+          setStep("choose");
+          setBusy(false);
+          return;
+        }
+        if (confirmBody.alreadyCheckedIn) {
+          setDoneInfo({
+            name: confirmBody.name ?? person.name,
+            fullCompanyName: confirmBody.full_company_name ?? person.fullCompanyName,
+            checkedInAt: confirmBody.checked_in_at,
+            method: "face",
+          });
+          setStep("already");
+        } else {
+          setDoneInfo({
+            name: confirmBody.name ?? person.name,
+            fullCompanyName: confirmBody.full_company_name ?? person.fullCompanyName,
+            checkedInAt: confirmBody.checked_in_at,
+            method: "face",
+          });
+          setStep("done");
+        }
+      } catch {
+        setError("Network error. Try again.");
+        setStep("choose");
+      } finally {
+        setBusy(false);
+      }
+    },
+    [person],
+  );
+
+  return (
+    <main className="wrap">
+      <div className="panel register-card">
+        {step === "lookup" && (
+          <h1 className="register-title register-title--in-card">
+            Early check-in
+          </h1>
+        )}
+
+        {error && <div className="notice notice--error">{error}</div>}
+
+        {step === "lookup" && (
+          <>
+            <p className="subtitle" style={{ textAlign: "center", marginBottom: 24 }}>
+              Enter your details to find your invitation.
+            </p>
+            <div className="register-field">
+              <label htmlFor="ci-name">Full Name</label>
+              <input
+                id="ci-name"
+                type="text"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="e.g. John Doe"
+              />
+            </div>
+            <div className="register-field">
+              <label htmlFor="ci-email">Company Email</label>
+              <input
+                id="ci-email"
+                type="email"
+                value={companyEmail}
+                onChange={(e) => setCompanyEmail(e.target.value)}
+                placeholder="e.g. john@snsnetwork.my"
+              />
+            </div>
+            <button
+              className="register-btn register-btn--primary register-btn--block"
+              onClick={lookup}
+              disabled={busy || !name.trim() || !companyEmail.trim()}
+            >
+              {busy ? "Looking up…" : "Check in"}
+            </button>
+          </>
+        )}
+
+        {step === "confirm" && person && (
+          <>
+            <h2 className="register-step-heading">Is this you?</h2>
+            <div className="register-confirm-card">
+              <dl>
+                <dt>Full Name</dt>
+                <dd>{person.name}</dd>
+                <dt>Contact Number</dt>
+                <dd>{person.contactNumber ?? DASH}</dd>
+                <dt>Company Email</dt>
+                <dd>{person.companyEmail ?? DASH}</dd>
+                <dt>Full Company Name</dt>
+                <dd>{person.fullCompanyName ?? DASH}</dd>
+                <dt>Designation</dt>
+                <dd>{person.designation ?? DASH}</dd>
+              </dl>
+            </div>
+            <div className="register-actions">
+              <button
+                className="register-btn register-btn--primary register-btn--block"
+                onClick={() => setStep("choose")}
+              >
+                Yes, continue
+              </button>
+              <button
+                className="register-btn register-btn--ghost register-btn--block"
+                onClick={resetAll}
+              >
+                No, start over
+              </button>
+            </div>
+          </>
+        )}
+
+        {step === "choose" && person && (
+          <>
+            <h2 className="register-step-heading">Choose check-in method</h2>
+            {person.hasEmbedding ? (
+              <div className="register-method-option">
+                <div className="register-method-icon">😊</div>
+                <div className="register-method-body">
+                  <strong>Face check-in</strong>
+                  <p>Fast and contactless. Line up your face on the next screen.</p>
+                </div>
+              </div>
+            ) : (
+              <div className="register-method-option register-method-option--muted">
+                <div className="register-method-icon">🚫</div>
+                <div className="register-method-body">
+                  <strong>Face check-in not available</strong>
+                  <p>You haven&apos;t registered a face yet.</p>
+                </div>
+              </div>
+            )}
+            <div className="register-actions">
+              <button
+                className="register-btn register-btn--primary register-btn--block"
+                onClick={() => setCameraOpen(true)}
+                disabled={!person.hasEmbedding || busy}
+              >
+                Check in with face
+              </button>
+              <button
+                className="register-btn register-btn--ghost register-btn--block"
+                onClick={recordManualCheckin}
+                disabled={busy}
+              >
+                Check in manually
+              </button>
+            </div>
+            <FaceCapture
+              open={cameraOpen}
+              onClose={() => setCameraOpen(false)}
+              onCapture={handleFaceCapture}
+              onError={(msg) => setError(msg)}
+            />
+          </>
+        )}
+
+        {step === "matching" && (
+          <div className="register-matching">
+            <div className="spinner" aria-hidden />
+            <h2>Verifying your face…</h2>
+          </div>
+        )}
+
+        {(step === "done" || step === "already") && doneInfo && (
+          <div className="register-result">
+            <div className="register-result__icon">
+              {step === "done" ? "✓" : "✓"}
+            </div>
+            <h2 className="register-step-heading">
+              {step === "done" ? "Welcome!" : "Already checked in"}
+            </h2>
+            <p className="register-result__name">{doneInfo.name}</p>
+            {doneInfo.fullCompanyName && (
+              <p className="register-result__company">{doneInfo.fullCompanyName}</p>
+            )}
+            <p className="register-result__detail">
+              {step === "done"
+                ? `Checked in ${doneInfo.method === "face" ? "with face recognition" : "manually"}.`
+                : doneInfo.checkedInAt
+                  ? `You checked in at ${new Date(doneInfo.checkedInAt).toLocaleString("en-US", {
+                      year: "numeric",
+                      month: "numeric",
+                      day: "numeric",
+                      hour: "numeric",
+                      minute: "2-digit",
+                    })}.`
+                  : "You are already checked in."}
+            </p>
+            <div className="register-actions">
+              <button
+                className="register-btn register-btn--primary register-btn--block"
+                onClick={resetAll}
+              >
+                Check in another guest
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    </main>
+  );
+}

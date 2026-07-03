@@ -38,6 +38,7 @@ export interface PersonRow extends RowDataPacket {
   remarks: string | null;
   photo_path: string | null;
   qr_code_path: string | null;
+  embedding: Buffer | null;
   consent_at: string | null;
   created_at: string;
   updated_at: string | null;
@@ -69,6 +70,7 @@ const PERSON_COLS = [
   "remarks",
   "photo_path",
   "qr_code_path",
+  "embedding",
   "consent_at",
   "created_at",
   "updated_at",

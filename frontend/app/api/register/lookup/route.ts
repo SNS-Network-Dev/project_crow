@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { findPersonByNameAndCompanyEmail } from "@/lib/db";
+import { BASE_PATH } from "@/lib/basePath";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -42,5 +43,7 @@ export async function POST(req: Request) {
     designation: person.designation,
     invitedBy: person.invited_by,
     remarks: person.remarks,
+    hasEmbedding: !!person.embedding && person.embedding.length > 0,
+    photoUrl: person.photo_path ? `${BASE_PATH}/api/photos/${person.id}` : null,
   });
 }
