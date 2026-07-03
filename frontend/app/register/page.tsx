@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useState } from "react";
-import Image from "next/image";
+// import Image from "next/image";
 import { BASE_PATH } from "@/lib/basePath";
 import FaceCapture from "../components/FaceCapture";
 
@@ -132,29 +132,17 @@ export default function RegisterPage() {
 
   return (
     <main className="wrap">
-      <div className="register-logo">
-        <Image
-          src={`${BASE_PATH}/sns-network-logo.png`}
-          alt="SNS Network"
-          width={160}
-          height={60}
-          priority
-        />
-      </div>
-      <h1 className="register-title">Register face check-in</h1>
-
-      <div className="panel">
+      <div className="panel register-card">
+        <h1 className="register-title register-title--in-card">
+          Skip the queue and register for face check in
+        </h1>
         {error && <div className="notice notice--error">{error}</div>}
         {doneMsg && <div className="notice notice--ok">{doneMsg}</div>}
 
         {step === "lookup" && (
           <>
-            <p className="subtitle" style={{ marginBottom: 18 }}>
-              Enter your full name and company email as registered to find your
-              invitation.
-            </p>
-            <div className="form-section" style={{ paddingTop: 0 }}>
-              <label htmlFor="reg-name">Full Name *</label>
+            <div className="register-field">
+              <label htmlFor="reg-name">Full Name</label>
               <input
                 id="reg-name"
                 type="text"
@@ -162,7 +150,9 @@ export default function RegisterPage() {
                 onChange={(e) => setName(e.target.value)}
                 placeholder="e.g. John Doe"
               />
-              <label htmlFor="reg-email">Company Email *</label>
+            </div>
+            <div className="register-field">
+              <label htmlFor="reg-email">Company Email</label>
               <input
                 id="reg-email"
                 type="email"
@@ -172,7 +162,7 @@ export default function RegisterPage() {
               />
             </div>
             <button
-              className="btn btn--lg btn--block"
+              className="register-submit"
               onClick={lookup}
               disabled={busy || !name.trim() || !companyEmail.trim()}
             >
