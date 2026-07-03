@@ -1,8 +1,9 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { BASE_PATH } from "@/lib/basePath";
 import FaceCapture from "../components/FaceCapture";
+import CountdownTimer from "../components/CountdownTimer";
 
 interface FoundPerson {
   id: number;
@@ -36,6 +37,10 @@ const DASH = "—";
 
 export default function EarlyCheckinPage() {
   const [step, setStep] = useState<CheckinStep>("lookup");
+  const [countdownEnabled, setCountdownEnabled] = useState(false);
+  const [countdownTarget, setCountdownTarget] = useState(
+    "2025-07-17T17:00:00+08:00",
+  );
   const [name, setName] = useState("");
   const [companyEmail, setCompanyEmail] = useState("");
   const [person, setPerson] = useState<FoundPerson | null>(null);
@@ -43,6 +48,22 @@ export default function EarlyCheckinPage() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [doneInfo, setDoneInfo] = useState<DoneInfo | null>(null);
+
+  useEffect(() => {
+    fetch(`${BASE_PATH}/api/settings`, { cache: "no-store" })
+      .then((res) => res.json())
+      .then((data) => {
+        if (typeof data.earlyCheckinCountdownEnabled === "boolean") {
+          setCountdownEnabled(data.earlyCheckinCountdownEnabled);
+        }
+        if (typeof data.earlyCheckinTargetIso === "string") {
+          setCountdownTarget(data.earlyCheckinTargetIso);
+        }
+      })
+      .catch(() => {
+        /* ignore; defaults are safe */
+      });
+  }, []);
 
   const resetAll = useCallback(() => {
     setStep("lookup");
@@ -205,6 +226,8 @@ export default function EarlyCheckinPage() {
     [person],
   );
 
+  const eventOpen = !countdownEnabled || Date.now() >= new Date(countdownTarget).getTime();
+
   return (
     <main className="wrap">
       <div className="panel register-card">
@@ -216,7 +239,11 @@ export default function EarlyCheckinPage() {
 
         {error && <div className="notice notice--error">{error}</div>}
 
-        {step === "lookup" && (
+        {step === "lookup" && !eventOpen && (
+          <CountdownTimer targetIso={countdownTarget} enabled={countdownEnabled} />
+        )}
+
+        {step === "lookup" && eventOpen && (
           <>
             <p className="subtitle" style={{ textAlign: "center", marginBottom: 24 }}>
               Enter your details to find your invitation.

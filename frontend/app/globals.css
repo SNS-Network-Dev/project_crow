@@ -1176,6 +1176,49 @@ th {
   color: var(--text);
   margin-bottom: 24px;
 }
+.register-countdown {
+  text-align: center;
+  padding: 12px 0 8px;
+}
+.register-countdown h2 {
+  font-size: 1.1rem;
+  font-weight: 600;
+  margin-bottom: 16px;
+  color: var(--muted);
+}
+.register-countdown__grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+  max-width: 360px;
+  margin: 0 auto 16px;
+}
+.register-countdown__unit {
+  background: #f1f5f9;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 14px 6px;
+}
+.register-countdown__unit span {
+  display: block;
+  font-size: 1.6rem;
+  font-weight: 700;
+  color: #1d7ed4;
+  line-height: 1;
+}
+.register-countdown__unit label {
+  display: block;
+  margin-top: 6px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+}
+.register-countdown__hint {
+  font-size: 0.9rem;
+  color: var(--muted);
+}
 
 /* Pure-CSS × for the kiosk exit button (no glyph). */
 .kiosk-x {

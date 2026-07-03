@@ -6,9 +6,10 @@ import PeopleTable from "./components/PeopleTable";
 import PersonDrawer from "./components/PersonDrawer";
 import CheckinsTable from "./components/CheckinsTable";
 import LiveClock from "./components/LiveClock";
+import SettingsPanel from "./components/SettingsPanel";
 import styles from "./components/admin.module.css";
 
-type Tab = "people" | "checkins" | "notCheckedIn";
+type Tab = "people" | "checkins" | "notCheckedIn" | "settings";
 
 export default function AdminPage() {
   const data = useAdminData();
@@ -69,6 +70,12 @@ export default function AdminPage() {
         >
           Not checked in ({notCheckedInCount})
         </button>
+        <button
+          className={tab === "settings" ? "tab tab--active" : "tab"}
+          onClick={() => setTab("settings")}
+        >
+          Settings
+        </button>
         <input
           className="tabSearch"
           type="text"
@@ -111,6 +118,8 @@ export default function AdminPage() {
           checkedInFilter="notCheckedIn"
         />
       )}
+
+      {tab === "settings" && <SettingsPanel />}
 
       <PersonDrawer
         person={selectedPerson}
