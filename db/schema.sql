@@ -36,3 +36,13 @@ CREATE TABLE IF NOT EXISTS project_crow_checkins (
     CONSTRAINT fk_crow_checkin_person FOREIGN KEY (person_id)
         REFERENCES project_crow_people(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS project_crow_admins (
+    id            BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    email         VARCHAR(255)    NOT NULL,
+    password_hash VARCHAR(255)    NOT NULL,           -- PBKDF2 salt:hash (base64)
+    created_at    DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_crow_admins_email (email),
+    KEY idx_crow_admins_created (created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

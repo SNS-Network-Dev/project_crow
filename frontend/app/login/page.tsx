@@ -16,6 +16,7 @@ function LoginForm() {
   const rawNext = params.get("next") ?? "";
   const next = rawNext.startsWith("/") ? rawNext : "/admin";
 
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -29,9 +30,12 @@ function LoginForm() {
         const res = await fetch(`${BASE_PATH}/api/login`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ password }),
+          body: JSON.stringify({ email, password }),
         });
-        const body = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string };
+        const body = (await res.json().catch(() => ({}))) as {
+          ok?: boolean;
+          error?: string;
+        };
         if (!res.ok || !body.ok) {
           setError(body.error ?? "Login failed.");
           setBusy(false);
@@ -44,12 +48,27 @@ function LoginForm() {
         setBusy(false);
       }
     },
-    [password, next, router],
+    [email, password, next, router],
   );
 
   return (
     <form onSubmit={submit} className="loginForm">
       {error && <div className="notice notice--error">{error}</div>}
+      <div className="loginField">
+        <label htmlFor="email" className="loginLabel">
+          Email
+        </label>
+        <input
+          id="email"
+          className="loginInput"
+          type="email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          autoFocus
+          autoComplete="email"
+          placeholder="admin@example.com"
+        />
+      </div>
       <div className="loginField">
         <label htmlFor="password" className="loginLabel">
           Password
@@ -60,12 +79,11 @@ function LoginForm() {
           type="password"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
-          autoFocus
           autoComplete="current-password"
           placeholder="Enter admin password"
         />
       </div>
-      <button className="loginBtn" type="submit" disabled={busy || !password}>
+      <button className="loginBtn" type="submit" disabled={busy || !email || !password}>
         {busy ? "Signing in…" : "Sign In"}
       </button>
     </form>

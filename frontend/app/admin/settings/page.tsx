@@ -1,3 +1,4 @@
+import AdminUsersPanel from "../components/AdminUsersPanel";
 import SettingsPanel from "../components/SettingsPanel";
 
 export default function SettingsPage() {
@@ -5,9 +6,10 @@ export default function SettingsPage() {
     <main className="wrap wrap--wide">
       <h1 style={{ marginBottom: 6 }}>Settings</h1>
       <p className="subtitle" style={{ marginBottom: 24 }}>
-        Manage event details and early check-in options.
+        Manage event details, early check-in, and admin users.
       </p>
       <SettingsPanel />
+      <AdminUsersPanel />
     </main>
   );
 }

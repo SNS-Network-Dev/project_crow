@@ -15,4 +15,9 @@ next-env.d.ts
 
 # local tooling / dev server logs
 .claude/
+claude/
 dev.log
+
+# local runtime data (settings JSON, uploads, etc.)
+frontend/data/
+

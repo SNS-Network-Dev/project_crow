@@ -8,14 +8,16 @@ import type { NextRequest } from "next/server";
 //   /register and /                -> public (guests use these)
 //   /admin/* and /kiosk              -> operator-only (and their /api/* routes)
 //
-// Auth model: a single shared passphrase in the ADMIN_PASSWORD env var. The
-// /api/login route verifies that passphrase and sets an httpOnly `crow_admin`
-// cookie whose value IS the password (compared here). A second client-readable
+// Auth model: database-backed admins with a secure fallback to the
+// ADMIN_PASSWORD env var when no DB admins exist. /api/login verifies the
+// credentials and sets an httpOnly `crow_admin` cookie whose value IS the
+// env password when one is configured (compared here). A second client-readable
 // `crow_admin_status=1` cookie lets the Sidebar show/hide admin links without
 // exposing the secret.
 //
-// When ADMIN_PASSWORD is unset, admin is open (localhost dev convenience) and
-// we stamp `crow_admin_status=1` so the Sidebar still reveals the admin links.
+// When ADMIN_PASSWORD is unset and there are no DB admins, admin stays open
+// (localhost dev convenience) and we stamp `crow_admin_status=1` so the Sidebar
+// still reveals the admin links.
 
 const ADMIN_COOKIE = "crow_admin";
 
@@ -28,10 +30,25 @@ function isProtectedPage(pathname: string): boolean {
   );
 }
 
-function isProtectedApi(pathname: string): boolean {
+function isProtectedApi(request: NextRequest): boolean {
+  const pathname = request.nextUrl.pathname;
+  const method = request.method;
+
   // NOTE: '/api/checkin' prefix also covers '/api/checkins'. '/api/people'
   // covers '/api/people/[id]'. Public APIs (/api/register, /api/health,
-  // /api/login, /api/logout, /api/settings) are intentionally not listed here.
+  // /api/login, /api/logout) are intentionally not listed here.
+  //
+  // /api/settings GET is public (used by /early-checkin), but mutations are
+  // admin-only. /api/admins is fully admin-only.
+  if (pathname.startsWith("/api/admins")) return true;
+  if (
+    (pathname === "/api/settings" || pathname.startsWith("/api/settings/")) &&
+    method !== "GET" &&
+    method !== "HEAD"
+  ) {
+    return true;
+  }
+
   return (
     pathname.startsWith("/api/people") ||
     pathname.startsWith("/api/checkin") ||
@@ -62,7 +79,7 @@ export function proxy(request: NextRequest) {
   }
 
   const protectedPage = isProtectedPage(pathname);
-  const protectedApi = isProtectedApi(pathname);
+  const protectedApi = isProtectedApi(request);
   if (!protectedPage && !protectedApi) {
     return NextResponse.next();
   }

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { countAdmins, findAdminByEmail, verifyPassword } from "@/lib/db";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -7,28 +8,63 @@ const ADMIN_COOKIE = "crow_admin";
 const MAX_AGE = 60 * 60 * 24 * 7; // 7 days
 
 export async function POST(request: Request) {
-  const pw = process.env.ADMIN_PASSWORD;
-  if (!pw) {
-    // No passphrase configured -> admin is open (see proxy.ts). Nothing to log
-    // into; tell the client so the login page can explain.
+  const body = (await request.json().catch(() => null)) as
+    | { email?: unknown; password?: unknown }
+    | null;
+  const email =
+    typeof body?.email === "string" ? body.email.trim().toLowerCase() : "";
+  const password = typeof body?.password === "string" ? body.password : "";
+
+  let dbAuthenticated = false;
+
+  // Prefer database admins. If at least one admin exists, enforce DB auth.
+  try {
+    const adminCount = await countAdmins();
+    if (adminCount > 0) {
+      if (!email) {
+        return NextResponse.json(
+          { error: "Email and password are required." },
+          { status: 400 },
+        );
+      }
+      const admin = await findAdminByEmail(email);
+      if (!admin || !verifyPassword(password, admin.password_hash)) {
+        return NextResponse.json(
+          { error: "Wrong email or password." },
+          { status: 401 },
+        );
+      }
+      dbAuthenticated = true;
+    }
+  } catch {
     return NextResponse.json(
-      { error: "No admin password is configured. Admin is open — just visit /admin." },
+      { error: "Could not verify credentials. Try again." },
       { status: 503 },
     );
   }
 
-  const body = (await request.json().catch(() => null)) as { password?: unknown } | null;
-  const password = typeof body?.password === "string" ? body.password : "";
-
-  if (password !== pw) {
-    return NextResponse.json({ error: "Wrong password." }, { status: 401 });
+  // Fallback to env ADMIN_PASSWORD when no DB admins exist (dev / bootstrap).
+  const envPw = process.env.ADMIN_PASSWORD;
+  if (!dbAuthenticated) {
+    if (!envPw) {
+      return NextResponse.json(
+        { error: "No admin password is configured. Admin is open — just visit /admin." },
+        { status: 503 },
+      );
+    }
+    if (password !== envPw) {
+      return NextResponse.json({ error: "Wrong password." }, { status: 401 });
+    }
   }
 
+  const token = dbAuthenticated
+    ? `${ADMIN_COOKIE}:db:${email}:${new Date().toISOString()}`
+    : (envPw ?? "");
+
   const res = NextResponse.json({ ok: true });
-  // httpOnly token the proxy checks; value is the passphrase itself (compared
-  // to ADMIN_PASSWORD). Good enough for a LAN event tool; the cookie is not
-  // JS-readable. The separate status cookie below is what the Sidebar reads.
-  res.cookies.set(ADMIN_COOKIE, pw, {
+  // httpOnly token the proxy checks. For DB auth we still need a stable secret
+  // comparable in proxy.ts, so we keep envPw as the cookie value when present.
+  res.cookies.set(ADMIN_COOKIE, envPw ?? token, {
     httpOnly: true,
     sameSite: "lax",
     path: "/",

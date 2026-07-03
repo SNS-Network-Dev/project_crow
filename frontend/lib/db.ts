@@ -1,5 +1,6 @@
 import mysql from "mysql2/promise";
 import type { RowDataPacket, ResultSetHeader } from "mysql2";
+import { pbkdf2Sync, randomBytes, timingSafeEqual } from "crypto";
 import { config } from "./config";
 
 // Reuse a single pool across hot-reloads / requests (module-global in the Node server).
@@ -376,4 +377,85 @@ export async function deleteCheckin(id: number): Promise<boolean> {
     [id],
   );
   return res.affectedRows > 0;
+}
+
+// ---------- admin users ----------
+
+const PBKDF2_ITERATIONS = 100_000;
+const PBKDF2_KEYLEN = 64;
+const PBKDF2_DIGEST = "sha512";
+
+export interface AdminRow extends RowDataPacket {
+  id: number;
+  email: string;
+  password_hash: string;
+  created_at: string;
+}
+
+function hashPassword(password: string): string {
+  const salt = randomBytes(16).toString("base64");
+  const hash = pbkdf2Sync(
+    password,
+    salt,
+    PBKDF2_ITERATIONS,
+    PBKDF2_KEYLEN,
+    PBKDF2_DIGEST,
+  ).toString("base64");
+  return `${salt}:${hash}`;
+}
+
+export function verifyPassword(password: string, stored: string): boolean {
+  const [salt, hash] = stored.split(":");
+  if (!salt || !hash) return false;
+  const computed = pbkdf2Sync(
+    password,
+    salt,
+    PBKDF2_ITERATIONS,
+    PBKDF2_KEYLEN,
+    PBKDF2_DIGEST,
+  );
+  const expected = Buffer.from(hash, "base64");
+  if (computed.length !== expected.length) return false;
+  return timingSafeEqual(computed, expected);
+}
+
+export async function createAdmin(p: {
+  email: string;
+  password: string;
+}): Promise<number> {
+  const [res] = await pool.execute<ResultSetHeader>(
+    `INSERT INTO project_crow_admins (email, password_hash) VALUES (?, ?)`,
+    [p.email.trim().toLowerCase(), hashPassword(p.password)],
+  );
+  return res.insertId;
+}
+
+export async function findAdminByEmail(email: string): Promise<AdminRow | null> {
+  const [rows] = await pool.query<AdminRow[]>(
+    `SELECT id, email, password_hash, created_at FROM project_crow_admins WHERE email = ? ORDER BY id DESC LIMIT 1`,
+    [email.trim().toLowerCase()],
+  );
+  return rows[0] ?? null;
+}
+
+export async function listAdmins(): Promise<AdminRow[]> {
+  const [rows] = await pool.query<AdminRow[]>(
+    `SELECT id, email, password_hash, created_at FROM project_crow_admins ORDER BY email ASC`,
+  );
+  return rows;
+}
+
+export async function deleteAdmin(id: number): Promise<boolean> {
+  const [res] = await pool.execute<ResultSetHeader>(
+    `DELETE FROM project_crow_admins WHERE id = ?`,
+    [id],
+  );
+  return res.affectedRows > 0;
+}
+
+export async function countAdmins(): Promise<number> {
+  const [rows] = await pool.query<RowDataPacket[]>(
+    `SELECT COUNT(*) AS c FROM project_crow_admins`,
+  );
+  return Number(rows[0].c);
 }
