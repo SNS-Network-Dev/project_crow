@@ -60,7 +60,40 @@ const ADMIN_ITEMS: NavItem[] = [
     ),
   },
   {
-    href: "/list",
+    href: "/admin/checkin",
+    label: "Check in",
+    icon: (
+      <svg viewBox="0 0 24 24" width="16" height="16" {...stroke}>
+        <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+        <circle cx="9" cy="7" r="4" />
+        <polyline points="16 11 18 13 22 9" />
+      </svg>
+    ),
+  },
+  {
+    href: "/admin/avatar",
+    label: "Photo booth",
+    exact: true,
+    icon: (
+      <svg viewBox="0 0 24 24" width="16" height="16" {...stroke}>
+        <path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z" />
+        <circle cx="12" cy="13" r="3" />
+      </svg>
+    ),
+  },
+  {
+    href: "/admin/avatar/gallery",
+    label: "Photo gallery",
+    icon: (
+      <svg viewBox="0 0 24 24" width="16" height="16" {...stroke}>
+        <rect width="18" height="18" x="3" y="3" rx="2" ry="2" />
+        <circle cx="9" cy="9" r="2" />
+        <path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21" />
+      </svg>
+    ),
+  },
+  {
+    href: "/admin/list",
     label: "List",
     icon: (
       <svg viewBox="0 0 24 24" width="16" height="16" {...stroke}>
@@ -72,7 +105,7 @@ const ADMIN_ITEMS: NavItem[] = [
     ),
   },
   {
-    href: "/settings",
+    href: "/admin/settings",
     label: "Settings",
     icon: (
       <svg viewBox="0 0 24 24" width="16" height="16" {...stroke}>
@@ -195,8 +228,7 @@ export default function Sidebar() {
 
   const isActive = (it: NavItem) =>
     pathname === it.href ||
-    (!it.exact && it.href !== "/" && !!pathname?.startsWith(it.href + "/")) ||
-    (it.href === "/checkin" && pathname === "/kiosk");
+    (!it.exact && it.href !== "/" && !!pathname?.startsWith(it.href + "/"));
 
   const renderItem = (it: NavItem) => (
     <Link

@@ -1,12 +1,12 @@
 "use client";
 
 import { useCallback, useState } from "react";
-import { useAdminData } from "../admin/components/useAdminData";
-import PeopleTable from "../admin/components/PeopleTable";
-import PersonDrawer from "../admin/components/PersonDrawer";
-import CheckinsTable from "../admin/components/CheckinsTable";
-import LiveClock from "../admin/components/LiveClock";
-import styles from "../admin/components/admin.module.css";
+import { useAdminData } from "../components/useAdminData";
+import PeopleTable from "../components/PeopleTable";
+import PersonDrawer from "../components/PersonDrawer";
+import CheckinsTable from "../components/CheckinsTable";
+import LiveClock from "../components/LiveClock";
+import styles from "../components/admin.module.css";
 
 type Tab = "people" | "checkins" | "notCheckedIn";
 

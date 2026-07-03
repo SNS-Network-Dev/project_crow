@@ -10,7 +10,7 @@ import { useAdminHome } from "./useAdminHome";
 // station then BLOCKS on generation (a spinner) which self-throttles the serialized
 // GPU — the operator can't fire another shot until this one lands. On success the
 // figures are pushed to the live wall and the station resets for the next guest.
-// The guest never sees a result here; they pick + download at /avatar/gallery.
+// The guest never sees a result here; they pick + download at /admin/avatar/gallery.
 
 type Mode = "kelvin" | "group";
 type Phase = "live" | "generating" | "done";

@@ -6,9 +6,9 @@ import { BASE_PATH } from "@/lib/basePath";
 import { useAdminHome } from "./useAdminHome";
 import useFaceAutoCapture from "./useFaceAutoCapture";
 
-// One unified, responsive check-in surface for BOTH phone (/checkin) and the iPad
-// kiosk (/kiosk). It fills the screen, uses the shared useFaceAutoCapture hook
-// for the alignment ring + auto-capture, then runs the recognition flow
+// One unified, responsive check-in surface for BOTH phone (/admin/checkin) and
+// the iPad kiosk (/kiosk). It fills the screen, uses the shared useFaceAutoCapture
+// hook for the alignment ring + auto-capture, then runs the recognition flow
 // (/api/checkin -> /api/confirm). Recognition itself stays on the GPU.
 
 interface Candidate {

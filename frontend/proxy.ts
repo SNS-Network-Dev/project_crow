@@ -5,8 +5,8 @@ import type { NextRequest } from "next/server";
 // `proxy`, not `middleware`). See node_modules/next/dist/docs/.../proxy.md.
 //
 // Access control for Project Crow:
-//   /register and /               -> public (guests use these)
-//   /checkin /avatar /kiosk /admin -> operator-only (and their /api/* routes)
+//   /register and /                -> public (guests use these)
+//   /admin/* and /kiosk              -> operator-only (and their /api/* routes)
 //
 // Auth model: a single shared passphrase in the ADMIN_PASSWORD env var. The
 // /api/login route verifies that passphrase and sets an httpOnly `crow_admin`
@@ -21,16 +21,10 @@ const ADMIN_COOKIE = "crow_admin";
 
 function isProtectedPage(pathname: string): boolean {
   return (
-    pathname === "/checkin" ||
-    pathname.startsWith("/checkin/") ||
-    pathname === "/avatar" ||
-    pathname.startsWith("/avatar/") ||
+    pathname === "/admin" ||
+    pathname.startsWith("/admin/") ||
     pathname === "/kiosk" ||
-    pathname.startsWith("/kiosk/") ||
-    pathname === "/list" ||
-    pathname.startsWith("/list/") ||
-    pathname === "/settings" ||
-    pathname.startsWith("/settings/")
+    pathname.startsWith("/kiosk/")
   );
 }
 

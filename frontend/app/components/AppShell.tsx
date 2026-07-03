@@ -3,16 +3,17 @@
 import { usePathname } from "next/navigation";
 import Sidebar from "./Sidebar";
 
-// The sidebar (operator nav) appears on the list dashboard, settings page, and
-// the photo gallery station — all operator hubs. The full-screen tool surfaces
-// (/checkin, /avatar, /kiosk) render bare so the camera/stage can use the whole
-// viewport; they're still gated by proxy.ts, just without the rail. Public
-// surfaces (/register, /login, /early-checkin, and the / redirect) are also bare.
-const ADMIN_PREFIXES = ["/list", "/settings", "/avatar/gallery"];
+// The sidebar (operator nav) appears on the admin hub (/admin/list,
+// /admin/settings) and the photo gallery (/admin/avatar/gallery). Admin
+// full-screen tools (/admin/checkin, /admin/avatar, /kiosk) render bare so the
+// camera/stage can use the whole viewport; they're still gated by proxy.ts,
+// just without the rail. Public surfaces (/register, /login, /early-checkin,
+// and the / redirect) are also bare.
+const SIDEBAR_ADMIN_PREFIXES = ["/admin/list", "/admin/settings", "/admin/avatar/gallery"];
 
 function isAdminRoute(pathname: string | null): boolean {
   if (!pathname) return false;
-  return ADMIN_PREFIXES.some(
+  return SIDEBAR_ADMIN_PREFIXES.some(
     (p) => pathname === p || pathname.startsWith(p + "/"),
   );
 }

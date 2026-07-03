@@ -6,7 +6,8 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 // The live wall feed for the pickup station (operator-gated via proxy.ts — this
-// sits under the protected /api/avatar prefix). The gallery page polls this.
+// sits under the protected /api/avatar prefix; the gallery page at
+// /admin/avatar/gallery polls this.
 // Poster thumbnails are served through the gated /api/posters/[id] (the operator
 // device has the cookie); the phone download link uses the PUBLIC /api/shot/[id].
 export async function GET() {
