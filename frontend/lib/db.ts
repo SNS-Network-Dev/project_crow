@@ -78,7 +78,7 @@ const PERSON_COLS = [
 
 export async function createPerson(p: {
   name: string;
-  email: string | null;
+  email?: string | null;
   contactNumber?: string | null;
   companyEmail?: string | null;
   fullCompanyName?: string | null;
@@ -86,17 +86,18 @@ export async function createPerson(p: {
   invitedBy?: string | null;
   details?: string | null; // JSON string or null (legacy)
   remarks?: string | null;
+  qrCode?: string | null;
   embedding: Buffer; // raw 2048 bytes (512 x float32 LE)
   consent: boolean;
 }): Promise<number> {
   const [res] = await pool.execute<ResultSetHeader>(
     `INSERT INTO project_crow_people
        (name, email, contact_number, company_email, full_company_name,
-        designation, invited_by, details, remarks, embedding, consent_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        designation, invited_by, details, remarks, qr_code_path, embedding, consent_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       p.name,
-      p.email,
+      p.email ?? null,
       p.contactNumber ?? null,
       p.companyEmail ?? null,
       p.fullCompanyName ?? null,
@@ -104,11 +105,39 @@ export async function createPerson(p: {
       p.invitedBy ?? null,
       p.details ?? null,
       p.remarks ?? null,
+      p.qrCode ?? null,
       p.embedding,
       p.consent ? new Date() : null,
     ],
   );
   return res.insertId;
+}
+
+const QR_CHARS =
+  "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+
+function randomQrCode(): string {
+  let code = "";
+  for (let i = 0; i < 8; i++) {
+    code += QR_CHARS.charAt(Math.floor(Math.random() * QR_CHARS.length));
+  }
+  return code;
+}
+
+export async function generateUniqueQrCode(): Promise<string> {
+  let code = randomQrCode();
+  while (await qrCodeExists(code)) {
+    code = randomQrCode();
+  }
+  return code;
+}
+
+export async function qrCodeExists(code: string): Promise<boolean> {
+  const [rows] = await pool.query<RowDataPacket[]>(
+    `SELECT 1 FROM project_crow_people WHERE qr_code_path = ? LIMIT 1`,
+    [code],
+  );
+  return rows.length > 0;
 }
 
 export async function setPhotoPath(

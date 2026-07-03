@@ -5,10 +5,27 @@ import Image from "next/image";
 import { BASE_PATH } from "@/lib/basePath";
 import FaceCapture from "../components/FaceCapture";
 
+const COUNTRY_CODES = [
+  { code: "+60", label: "Malaysia (+60)", flag: "🇲🇾" },
+  { code: "+65", label: "Singapore (+65)", flag: "🇸🇬" },
+  { code: "+62", label: "Indonesia (+62)", flag: "🇮🇩" },
+  { code: "+66", label: "Thailand (+66)", flag: "🇹🇭" },
+  { code: "+84", label: "Vietnam (+84)", flag: "🇻🇳" },
+  { code: "+63", label: "Philippines (+63)", flag: "🇵🇭" },
+  { code: "+91", label: "India (+91)", flag: "🇮🇳" },
+  { code: "+86", label: "China (+86)", flag: "🇨🇳" },
+  { code: "+81", label: "Japan (+81)", flag: "🇯🇵" },
+  { code: "+82", label: "South Korea (+82)", flag: "🇰🇷" },
+  { code: "+1", label: "USA / Canada (+1)", flag: "🇺🇸" },
+  { code: "+44", label: "UK (+44)", flag: "🇬🇧" },
+  { code: "+61", label: "Australia (+61)", flag: "🇦🇺" },
+  { code: "+", label: "Other", flag: "🌐" },
+];
+
 export default function RegisterPage() {
   const [name, setName] = useState("");
+  const [countryCode, setCountryCode] = useState("+60");
   const [contactNumber, setContactNumber] = useState("");
-  const [email, setEmail] = useState("");
   const [companyEmail, setCompanyEmail] = useState("");
   const [fullCompanyName, setFullCompanyName] = useState("");
   const [designation, setDesignation] = useState("");
@@ -36,8 +53,8 @@ export default function RegisterPage() {
 
   const resetForm = useCallback(() => {
     setName("");
+    setCountryCode("+60");
     setContactNumber("");
-    setEmail("");
     setCompanyEmail("");
     setFullCompanyName("");
     setDesignation("");
@@ -48,6 +65,12 @@ export default function RegisterPage() {
     setCameraError(null);
     setCameraOpen(false);
   }, [setPhotoBlob]);
+
+  const fullContactNumber = useCallback(() => {
+    const digits = contactNumber.trim().replace(/\D/g, "");
+    if (!digits) return "";
+    return `${countryCode} ${digits}`;
+  }, [countryCode, contactNumber]);
 
   const submit = useCallback(async () => {
     setError(null);
@@ -61,9 +84,8 @@ export default function RegisterPage() {
       const fd = new FormData();
       fd.append("photo", photo, "photo.jpg");
       fd.append("name", name.trim());
-      if (email.trim()) fd.append("email", email.trim());
-      if (contactNumber.trim())
-        fd.append("contactNumber", contactNumber.trim());
+      const phone = fullContactNumber();
+      if (phone) fd.append("contactNumber", phone);
       if (companyEmail.trim()) fd.append("companyEmail", companyEmail.trim());
       if (fullCompanyName.trim())
         fd.append("fullCompanyName", fullCompanyName.trim());
@@ -81,7 +103,9 @@ export default function RegisterPage() {
         setError(body.error ?? "Registration failed.");
         return;
       }
-      setOkMsg(`Registered ${body.name} (id ${body.id}).`);
+      setOkMsg(
+        `Registered ${body.name} (id ${body.id}). QR code: ${body.qrCode}`,
+      );
       resetForm();
     } catch {
       setError("Network error. Try again.");
@@ -91,8 +115,7 @@ export default function RegisterPage() {
   }, [
     photo,
     name,
-    email,
-    contactNumber,
+    fullContactNumber,
     companyEmail,
     fullCompanyName,
     designation,
@@ -109,7 +132,12 @@ export default function RegisterPage() {
     onChange: (
       e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
     ) => void,
-    opts?: { type?: string; required?: boolean; textarea?: boolean },
+    opts?: {
+      type?: string;
+      required?: boolean;
+      textarea?: boolean;
+      placeholder?: string;
+    },
   ) => (
     <>
       <label htmlFor={htmlFor}>
@@ -117,13 +145,19 @@ export default function RegisterPage() {
         {opts?.required ? " *" : ""}
       </label>
       {opts?.textarea ? (
-        <textarea id={htmlFor} value={value} onChange={onChange} />
+        <textarea
+          id={htmlFor}
+          value={value}
+          onChange={onChange}
+          placeholder={opts.placeholder}
+        />
       ) : (
         <input
           id={htmlFor}
           type={opts?.type ?? "text"}
           value={value}
           onChange={onChange}
+          placeholder={opts?.placeholder}
         />
       )}
     </>
@@ -151,21 +185,31 @@ export default function RegisterPage() {
           <legend>Personal Information</legend>
           {field("Full Name", "name", name, (e) => setName(e.target.value), {
             required: true,
+            placeholder: "e.g. John Doe",
           })}
-          {field(
-            "Contact Number",
-            "contactNumber",
-            contactNumber,
-            (e) => setContactNumber(e.target.value),
-            { type: "tel" },
-          )}
-          {field(
-            "Personal Email",
-            "email",
-            email,
-            (e) => setEmail(e.target.value),
-            { type: "email" },
-          )}
+
+          <label htmlFor="contactNumber">Contact Number</label>
+          <div className="register-phone-row">
+            <select
+              id="countryCode"
+              value={countryCode}
+              onChange={(e) => setCountryCode(e.target.value)}
+              aria-label="Country code"
+            >
+              {COUNTRY_CODES.map((c) => (
+                <option key={c.code} value={c.code}>
+                  {c.flag} {c.label}
+                </option>
+              ))}
+            </select>
+            <input
+              id="contactNumber"
+              type="tel"
+              value={contactNumber}
+              onChange={(e) => setContactNumber(e.target.value)}
+              placeholder="123456789"
+            />
+          </div>
         </fieldset>
 
         {/* ---- Company Information ---- */}
@@ -176,16 +220,28 @@ export default function RegisterPage() {
             "companyEmail",
             companyEmail,
             (e) => setCompanyEmail(e.target.value),
-            { type: "email" },
+            { type: "email", placeholder: "e.g. john@snsnetwork.my" },
           )}
-          {field("Full Company Name", "fullCompanyName", fullCompanyName, (e) =>
-            setFullCompanyName(e.target.value),
+          {field(
+            "Full Company Name",
+            "fullCompanyName",
+            fullCompanyName,
+            (e) => setFullCompanyName(e.target.value),
+            { placeholder: "e.g. SNS Network Sdn Bhd" },
           )}
-          {field("Designation", "designation", designation, (e) =>
-            setDesignation(e.target.value),
+          {field(
+            "Designation",
+            "designation",
+            designation,
+            (e) => setDesignation(e.target.value),
+            { placeholder: "e.g. Director or CEO" },
           )}
-          {field("Invited By", "invitedBy", invitedBy, (e) =>
-            setInvitedBy(e.target.value),
+          {field(
+            "Invited By",
+            "invitedBy",
+            invitedBy,
+            (e) => setInvitedBy(e.target.value),
+            { placeholder: "e.g. Mr. Kelvin" },
           )}
         </fieldset>
 
@@ -197,7 +253,7 @@ export default function RegisterPage() {
             "remarks",
             remarks,
             (e) => setRemarks(e.target.value),
-            { textarea: true },
+            { textarea: true, placeholder: "e.g. Allergy to fish" },
           )}
         </fieldset>
 

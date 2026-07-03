@@ -30,7 +30,7 @@ CALL crow_add_column('project_crow_people', 'full_company_name', 'VARCHAR(255) N
 CALL crow_add_column('project_crow_people', 'designation',       'VARCHAR(255) NULL AFTER full_company_name');
 CALL crow_add_column('project_crow_people', 'invited_by',        'VARCHAR(255) NULL AFTER designation');
 CALL crow_add_column('project_crow_people', 'remarks',           'TEXT         NULL AFTER invited_by');
-CALL crow_add_column('project_crow_people', 'qr_code_path',      'VARCHAR(512) NULL AFTER remarks');
+CALL crow_add_column('project_crow_people', 'qr_code_path',      'VARCHAR(512) NULL AFTER remarks'); -- 8-char random QR code shown in /admin
 CALL crow_add_column('project_crow_people', 'updated_at',        'DATETIME     NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP AFTER created_at');
 
 DROP PROCEDURE IF EXISTS crow_add_column;

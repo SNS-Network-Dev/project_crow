@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { embedEnroll, matrixAdd, BMEnrollError } from "@/lib/baremetal";
-import { createPerson, setPhotoPath } from "@/lib/db";
+import { createPerson, generateUniqueQrCode, setPhotoPath } from "@/lib/db";
 import { savePhoto } from "@/lib/photos";
 
 export const runtime = "nodejs";
@@ -18,18 +18,26 @@ export async function POST(request: Request) {
   try {
     form = await request.formData();
   } catch {
-    return NextResponse.json({ error: "Expected multipart/form-data." }, { status: 400 });
+    return NextResponse.json(
+      { error: "Expected multipart/form-data." },
+      { status: 400 },
+    );
   }
 
   const photo = form.get("photo");
   const name = (form.get("name") ?? "").toString().trim();
-  const email = trimOrNull((form.get("email") ?? "").toString());
-  const consent = TRUTHY.has((form.get("consent") ?? "").toString().toLowerCase());
+  const consent = TRUTHY.has(
+    (form.get("consent") ?? "").toString().toLowerCase(),
+  );
 
   // New registration fields
-  const contactNumber = trimOrNull((form.get("contactNumber") ?? "").toString());
+  const contactNumber = trimOrNull(
+    (form.get("contactNumber") ?? "").toString(),
+  );
   const companyEmail = trimOrNull((form.get("companyEmail") ?? "").toString());
-  const fullCompanyName = trimOrNull((form.get("fullCompanyName") ?? "").toString());
+  const fullCompanyName = trimOrNull(
+    (form.get("fullCompanyName") ?? "").toString(),
+  );
   const designation = trimOrNull((form.get("designation") ?? "").toString());
   const invitedBy = trimOrNull((form.get("invitedBy") ?? "").toString());
   const remarks = trimOrNull((form.get("remarks") ?? "").toString());
@@ -46,7 +54,10 @@ export async function POST(request: Request) {
   }
 
   if (!(photo instanceof Blob) || photo.size === 0) {
-    return NextResponse.json({ error: "A photo is required." }, { status: 400 });
+    return NextResponse.json(
+      { error: "A photo is required." },
+      { status: 400 },
+    );
   }
   if (!name) {
     return NextResponse.json({ error: "Name is required." }, { status: 400 });
@@ -54,7 +65,7 @@ export async function POST(request: Request) {
   if (!consent) {
     return NextResponse.json(
       { error: "You must consent to your face data being used for check-in." },
-      { status: 400 }
+      { status: 400 },
     );
   }
 
@@ -66,14 +77,17 @@ export async function POST(request: Request) {
     if (e instanceof BMEnrollError) {
       return NextResponse.json({ error: e.message }, { status: 400 });
     }
-    return NextResponse.json({ error: "Face service unavailable. Try again shortly." }, { status: 503 });
+    return NextResponse.json(
+      { error: "Face service unavailable. Try again shortly." },
+      { status: 503 },
+    );
   }
 
   // 2) Persist in MySQL (the source of truth), then store the photo as <id>.jpg.
   const photoBytes = Buffer.from(await photo.arrayBuffer());
+  const qrCode = await generateUniqueQrCode();
   const id = await createPerson({
     name,
-    email,
     contactNumber,
     companyEmail,
     fullCompanyName,
@@ -81,6 +95,7 @@ export async function POST(request: Request) {
     invitedBy,
     details,
     remarks,
+    qrCode,
     embedding,
     consent,
   });
@@ -95,5 +110,5 @@ export async function POST(request: Request) {
     /* self-heals via sync */
   }
 
-  return NextResponse.json({ id, name });
+  return NextResponse.json({ id, name, qrCode });
 }

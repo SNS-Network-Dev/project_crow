@@ -16,7 +16,7 @@ CREATE TABLE IF NOT EXISTS project_crow_people (
     remarks           TEXT            NULL,                 -- free-text notes
     embedding         VARBINARY(2048) NOT NULL,             -- 512 x float32 LE, L2-normalized (== np.float32(vec).tobytes())
     photo_path        VARCHAR(512)    NULL,                 -- filename on bridge filesystem (see PHOTO_DIR)
-    qr_code_path      VARCHAR(512)    NULL,                 -- filename for generated QR code (future)
+    qr_code_path      VARCHAR(512)    NULL,                 -- 8-char random QR code shown in /admin
     consent_at        DATETIME        NULL,                 -- when the person consented to face-data use (privacy)
     created_at        DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at        DATETIME        NULL     DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
