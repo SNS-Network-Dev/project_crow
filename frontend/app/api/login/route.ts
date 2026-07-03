@@ -54,11 +54,7 @@ export async function POST(request: Request) {
     res.cookies.set(cookies.token);
     res.cookies.set(cookies.status);
     return res;
-  } catch (e) {
-    const message = e instanceof Error ? e.message : "";
-    if (message.includes("SESSION_SECRET")) {
-      return NextResponse.json({ error: message }, { status: 500 });
-    }
+  } catch {
     return NextResponse.json(
       { error: "Could not sign in. Try again." },
       { status: 503 },

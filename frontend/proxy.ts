@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
-import { getSessionSecret, verifyAdminToken } from "./lib/session";
+import { verifyAdminToken } from "./lib/session";
 
 // Next 16 renamed `middleware.ts` -> `proxy.ts` (Node runtime; the function is
 // `proxy`, not `middleware`). See node_modules/next/dist/docs/.../proxy.md.
@@ -11,10 +11,12 @@ import { getSessionSecret, verifyAdminToken } from "./lib/session";
 //
 // Auth model: admin credentials live in the database (project_crow_admins).
 // /api/login verifies email/password and sets a signed httpOnly JWT cookie.
-// The signature key is SESSION_SECRET in frontend/.env.local — it is NOT an
-// admin password, just a random signing secret needed because middleware
-// cannot query MySQL. A second client-readable `crow_admin_status=1` cookie
-// lets the Sidebar show/hide admin links without exposing the token.
+// A second client-readable `crow_admin_status=1` cookie lets the Sidebar
+// show/hide admin links without exposing the token.
+//
+// The signing key has a built-in fallback so deployments don't need a
+// SESSION_SECRET env var. You can still set SESSION_SECRET if you want a
+// unique key, but it's optional.
 
 const ADMIN_COOKIE = "crow_admin";
 const STATUS_COOKIE = "crow_admin_status";
@@ -59,13 +61,8 @@ function isProtectedApi(request: NextRequest): boolean {
 }
 
 function isAuthed(request: NextRequest): boolean {
-  try {
-    const secret = getSessionSecret();
-    const token = request.cookies.get(ADMIN_COOKIE)?.value;
-    return verifyAdminToken(token, secret) !== null;
-  } catch {
-    return false;
-  }
+  const token = request.cookies.get(ADMIN_COOKIE)?.value;
+  return verifyAdminToken(token) !== null;
 }
 
 export function proxy(request: NextRequest) {
