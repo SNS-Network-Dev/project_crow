@@ -158,6 +158,35 @@ export async function getPerson(id: number): Promise<PersonRow | null> {
   return rows[0] ?? null;
 }
 
+export async function findPersonByNameAndCompanyEmail(
+  name: string,
+  companyEmail: string,
+): Promise<PersonRow | null> {
+  const [rows] = await pool.query<PersonRow[]>(
+    `SELECT ${PERSON_COLS} FROM project_crow_people WHERE name = ? AND company_email = ? ORDER BY id DESC LIMIT 1`,
+    [name.trim(), companyEmail.trim()],
+  );
+  return rows[0] ?? null;
+}
+
+export async function setEmbeddingAndPhoto(
+  id: number,
+  embedding: Buffer,
+  photoPath: string,
+): Promise<void> {
+  await pool.execute(
+    `UPDATE project_crow_people SET embedding = ?, photo_path = ? WHERE id = ?`,
+    [embedding, photoPath, id],
+  );
+}
+
+export async function setConsentAt(id: number): Promise<void> {
+  await pool.execute(
+    `UPDATE project_crow_people SET consent_at = ? WHERE id = ?`,
+    [new Date(), id],
+  );
+}
+
 export async function listPeople(): Promise<PersonRow[]> {
   const [rows] = await pool.query<PersonRow[]>(
     `SELECT ${PERSON_COLS} FROM project_crow_people ORDER BY name ASC`,

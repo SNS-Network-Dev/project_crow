@@ -5,40 +5,34 @@ import Image from "next/image";
 import { BASE_PATH } from "@/lib/basePath";
 import FaceCapture from "../components/FaceCapture";
 
-const COUNTRY_CODES = [
-  { code: "+60", label: "Malaysia (+60)", flag: "🇲🇾" },
-  { code: "+65", label: "Singapore (+65)", flag: "🇸🇬" },
-  { code: "+62", label: "Indonesia (+62)", flag: "🇮🇩" },
-  { code: "+66", label: "Thailand (+66)", flag: "🇹🇭" },
-  { code: "+84", label: "Vietnam (+84)", flag: "🇻🇳" },
-  { code: "+63", label: "Philippines (+63)", flag: "🇵🇭" },
-  { code: "+91", label: "India (+91)", flag: "🇮🇳" },
-  { code: "+86", label: "China (+86)", flag: "🇨🇳" },
-  { code: "+81", label: "Japan (+81)", flag: "🇯🇵" },
-  { code: "+82", label: "South Korea (+82)", flag: "🇰🇷" },
-  { code: "+1", label: "USA / Canada (+1)", flag: "🇺🇸" },
-  { code: "+44", label: "UK (+44)", flag: "🇬🇧" },
-  { code: "+61", label: "Australia (+61)", flag: "🇦🇺" },
-  { code: "+", label: "Other", flag: "🌐" },
-];
+interface FoundPerson {
+  id: number;
+  name: string;
+  contactNumber: string | null;
+  companyEmail: string | null;
+  fullCompanyName: string | null;
+  designation: string | null;
+  invitedBy: string | null;
+  remarks: string | null;
+}
+
+type RegisterStep = "lookup" | "confirm" | "ready" | "review" | "done";
+
+const TERMS_URL = "https://www.sns.com.my/terms-of-use/";
+const PDPA_URL = "https://www.sns.com.my/pdpa-notice/";
 
 export default function RegisterPage() {
+  const [step, setStep] = useState<RegisterStep>("lookup");
   const [name, setName] = useState("");
-  const [countryCode, setCountryCode] = useState("+60");
-  const [contactNumber, setContactNumber] = useState("");
   const [companyEmail, setCompanyEmail] = useState("");
-  const [fullCompanyName, setFullCompanyName] = useState("");
-  const [designation, setDesignation] = useState("");
-  const [invitedBy, setInvitedBy] = useState("");
-  const [remarks, setRemarks] = useState("");
-  const [consent, setConsent] = useState(false);
+  const [person, setPerson] = useState<FoundPerson | null>(null);
   const [photo, setPhoto] = useState<Blob | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
-  const [cameraError, setCameraError] = useState<string | null>(null);
   const [cameraOpen, setCameraOpen] = useState(false);
+  const [consent, setConsent] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [okMsg, setOkMsg] = useState<string | null>(null);
+  const [doneMsg, setDoneMsg] = useState<string | null>(null);
 
   const setPhotoBlob = useCallback(
     (blob: Blob | null) => {
@@ -51,47 +45,67 @@ export default function RegisterPage() {
     [setPhoto],
   );
 
-  const resetForm = useCallback(() => {
+  const resetAll = useCallback(() => {
+    setStep("lookup");
     setName("");
-    setCountryCode("+60");
-    setContactNumber("");
     setCompanyEmail("");
-    setFullCompanyName("");
-    setDesignation("");
-    setInvitedBy("");
-    setRemarks("");
-    setConsent(false);
+    setPerson(null);
     setPhotoBlob(null);
-    setCameraError(null);
+    setConsent(false);
+    setError(null);
+    setDoneMsg(null);
     setCameraOpen(false);
   }, [setPhotoBlob]);
 
-  const fullContactNumber = useCallback(() => {
-    const digits = contactNumber.trim().replace(/\D/g, "");
-    if (!digits) return "";
-    return `${countryCode} ${digits}`;
-  }, [countryCode, contactNumber]);
-
-  const submit = useCallback(async () => {
+  const lookup = useCallback(async () => {
     setError(null);
-    setOkMsg(null);
-    if (!photo) return setError("Add a photo first (capture or upload).");
-    if (!name.trim()) return setError("Full name is required.");
-    if (!consent) return setError("Consent is required.");
+    setBusy(true);
+    try {
+      const res = await fetch(`${BASE_PATH}/api/register/lookup`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: name.trim(),
+          companyEmail: companyEmail.trim(),
+        }),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setError(body.error ?? "Lookup failed.");
+        return;
+      }
+      setPerson(body);
+      setStep("confirm");
+    } catch {
+      setError("Network error. Try again.");
+    } finally {
+      setBusy(false);
+    }
+  }, [name, companyEmail]);
+
+  const handleCapture = useCallback(
+    (blob: Blob) => {
+      setPhotoBlob(blob);
+      setCameraOpen(false);
+      setStep("review");
+    },
+    [setPhotoBlob],
+  );
+
+  const enroll = useCallback(async () => {
+    setError(null);
+    if (!photo || !person) return;
+    if (!consent) {
+      setError("You must agree to the consent statement.");
+      return;
+    }
 
     setBusy(true);
     try {
       const fd = new FormData();
       fd.append("photo", photo, "photo.jpg");
-      fd.append("name", name.trim());
-      const phone = fullContactNumber();
-      if (phone) fd.append("contactNumber", phone);
-      if (companyEmail.trim()) fd.append("companyEmail", companyEmail.trim());
-      if (fullCompanyName.trim())
-        fd.append("fullCompanyName", fullCompanyName.trim());
-      if (designation.trim()) fd.append("designation", designation.trim());
-      if (invitedBy.trim()) fd.append("invitedBy", invitedBy.trim());
-      if (remarks.trim()) fd.append("remarks", remarks.trim());
+      fd.append("name", person.name);
+      fd.append("companyEmail", person.companyEmail ?? "");
       fd.append("consent", "true");
 
       const res = await fetch(`${BASE_PATH}/api/register`, {
@@ -100,68 +114,21 @@ export default function RegisterPage() {
       });
       const body = await res.json().catch(() => ({}));
       if (!res.ok) {
-        setError(body.error ?? "Registration failed.");
+        setError(body.error ?? "Enrollment failed.");
+        setStep("review");
         return;
       }
-      setOkMsg(
-        `Registered ${body.name} (id ${body.id}). QR code: ${body.qrCode}`,
-      );
-      resetForm();
+      setDoneMsg(`You're all set, ${body.name}! Face check-in is now active.`);
+      setStep("done");
     } catch {
       setError("Network error. Try again.");
+      setStep("review");
     } finally {
       setBusy(false);
     }
-  }, [
-    photo,
-    name,
-    fullContactNumber,
-    companyEmail,
-    fullCompanyName,
-    designation,
-    invitedBy,
-    remarks,
-    consent,
-    resetForm,
-  ]);
+  }, [photo, person, consent]);
 
-  const field = (
-    label: string,
-    htmlFor: string,
-    value: string,
-    onChange: (
-      e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
-    ) => void,
-    opts?: {
-      type?: string;
-      required?: boolean;
-      textarea?: boolean;
-      placeholder?: string;
-    },
-  ) => (
-    <>
-      <label htmlFor={htmlFor}>
-        {label}
-        {opts?.required ? " *" : ""}
-      </label>
-      {opts?.textarea ? (
-        <textarea
-          id={htmlFor}
-          value={value}
-          onChange={onChange}
-          placeholder={opts.placeholder}
-        />
-      ) : (
-        <input
-          id={htmlFor}
-          type={opts?.type ?? "text"}
-          value={value}
-          onChange={onChange}
-          placeholder={opts?.placeholder}
-        />
-      )}
-    </>
-  );
+  const DASH = "—";
 
   return (
     <main className="wrap">
@@ -174,160 +141,190 @@ export default function RegisterPage() {
           priority
         />
       </div>
-      <h1 className="register-title">Register</h1>
+      <h1 className="register-title">Register face check-in</h1>
 
       <div className="panel">
         {error && <div className="notice notice--error">{error}</div>}
-        {okMsg && <div className="notice notice--ok">{okMsg}</div>}
+        {doneMsg && <div className="notice notice--ok">{doneMsg}</div>}
 
-        {/* ---- Personal Information ---- */}
-        <fieldset className="form-section">
-          <legend>Personal Information</legend>
-          {field("Full Name", "name", name, (e) => setName(e.target.value), {
-            required: true,
-            placeholder: "e.g. John Doe",
-          })}
-
-          <label htmlFor="contactNumber">Contact Number</label>
-          <div className="register-phone-row">
-            <select
-              id="countryCode"
-              value={countryCode}
-              onChange={(e) => setCountryCode(e.target.value)}
-              aria-label="Country code"
-            >
-              {COUNTRY_CODES.map((c) => (
-                <option key={c.code} value={c.code}>
-                  {c.flag} {c.label}
-                </option>
-              ))}
-            </select>
-            <input
-              id="contactNumber"
-              type="tel"
-              value={contactNumber}
-              onChange={(e) => setContactNumber(e.target.value)}
-              placeholder="123456789"
-            />
-          </div>
-        </fieldset>
-
-        {/* ---- Company Information ---- */}
-        <fieldset className="form-section">
-          <legend>Company Information</legend>
-          {field(
-            "Company Email",
-            "companyEmail",
-            companyEmail,
-            (e) => setCompanyEmail(e.target.value),
-            { type: "email", placeholder: "e.g. john@snsnetwork.my" },
-          )}
-          {field(
-            "Full Company Name",
-            "fullCompanyName",
-            fullCompanyName,
-            (e) => setFullCompanyName(e.target.value),
-            { placeholder: "e.g. SNS Network Sdn Bhd" },
-          )}
-          {field(
-            "Designation",
-            "designation",
-            designation,
-            (e) => setDesignation(e.target.value),
-            { placeholder: "e.g. Director or CEO" },
-          )}
-          {field(
-            "Invited By",
-            "invitedBy",
-            invitedBy,
-            (e) => setInvitedBy(e.target.value),
-            { placeholder: "e.g. Mr. Kelvin" },
-          )}
-        </fieldset>
-
-        {/* ---- Additional Notes ---- */}
-        <fieldset className="form-section">
-          <legend>Additional Notes</legend>
-          {field(
-            "Remarks",
-            "remarks",
-            remarks,
-            (e) => setRemarks(e.target.value),
-            { textarea: true, placeholder: "e.g. Allergy to fish" },
-          )}
-        </fieldset>
-
-        {/* ---- Photo ---- */}
-        <fieldset className="form-section register-photo-section">
-          <legend>Photo *</legend>
-          {cameraError && (
-            <div className="notice notice--error">{cameraError}</div>
-          )}
-          {preview && (
-            <div className="register-preview-wrap">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={preview} alt="Preview" className="register-preview" />
+        {step === "lookup" && (
+          <>
+            <p className="subtitle" style={{ marginBottom: 18 }}>
+              Enter your full name and company email as registered to find your
+              invitation.
+            </p>
+            <div className="form-section" style={{ paddingTop: 0 }}>
+              <label htmlFor="reg-name">Full Name *</label>
+              <input
+                id="reg-name"
+                type="text"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="e.g. John Doe"
+              />
+              <label htmlFor="reg-email">Company Email *</label>
+              <input
+                id="reg-email"
+                type="email"
+                value={companyEmail}
+                onChange={(e) => setCompanyEmail(e.target.value)}
+                placeholder="e.g. john@snsnetwork.my"
+              />
             </div>
-          )}
-          <div className="row">
             <button
-              type="button"
-              className="btn"
+              className="btn btn--lg btn--block"
+              onClick={lookup}
+              disabled={busy || !name.trim() || !companyEmail.trim()}
+            >
+              {busy ? "Checking…" : "Check"}
+            </button>
+          </>
+        )}
+
+        {step === "confirm" && person && (
+          <>
+            <h2 style={{ marginBottom: 8 }}>Is this you?</h2>
+            <div className="register-confirm-card">
+              <dl>
+                <dt>Full Name</dt>
+                <dd>{person.name}</dd>
+                <dt>Contact Number</dt>
+                <dd>{person.contactNumber ?? DASH}</dd>
+                <dt>Company Email</dt>
+                <dd>{person.companyEmail ?? DASH}</dd>
+                <dt>Full Company Name</dt>
+                <dd>{person.fullCompanyName ?? DASH}</dd>
+                <dt>Designation</dt>
+                <dd>{person.designation ?? DASH}</dd>
+                <dt>Invited By</dt>
+                <dd>{person.invitedBy ?? DASH}</dd>
+                <dt>Remarks</dt>
+                <dd>{person.remarks ?? DASH}</dd>
+              </dl>
+            </div>
+            <div className="row" style={{ marginTop: 18 }}>
+              <button
+                className="btn btn--lg btn--block"
+                onClick={() => setStep("ready")}
+              >
+                Yes, this is me
+              </button>
+              <button
+                className="btn btn--ghost btn--lg btn--block"
+                onClick={resetAll}
+              >
+                No, start over
+              </button>
+            </div>
+          </>
+        )}
+
+        {step === "ready" && (
+          <>
+            <h2 style={{ marginBottom: 12 }}>Ready for your selfie?</h2>
+            <div className="notice notice--info" style={{ marginBottom: 16 }}>
+              Make sure you have good lighting, a plain background, and no
+              sunglasses or mask. Line up your face clearly on the next screen.
+            </div>
+            <p className="subtitle" style={{ marginBottom: 24 }}>
+              We do not keep your photos for model training. Your photo will be
+              deleted after the event.
+            </p>
+            <button
+              className="btn btn--lg btn--block"
               onClick={() => setCameraOpen(true)}
             >
-              Take photo
+              I&apos;m ready — take my photo
             </button>
-            <label
-              className="btn btn--ghost"
-              style={{ margin: 0, display: "inline-flex" }}
+            <button
+              className="btn btn--ghost btn--lg btn--block"
+              style={{ marginTop: 10 }}
+              onClick={resetAll}
             >
-              Upload file
-              <input
-                type="file"
-                accept="image/*"
-                hidden
-                onChange={(e) => setPhotoBlob(e.target.files?.[0] ?? null)}
+              Cancel
+            </button>
+          </>
+        )}
+
+        {(step === "review" || step === "done") && preview && (
+          <>
+            <h2 style={{ marginBottom: 12 }}>
+              {step === "done"
+                ? "Enrollment complete"
+                : "Are you satisfied with this photo?"}
+            </h2>
+            <div className="register-preview-wrap">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={preview}
+                alt="Captured photo"
+                className="register-preview"
               />
-            </label>
-            {preview && (
+            </div>
+
+            {step !== "done" && (
+              <>
+                <div className="register-consent">
+                  <input
+                    id="consent"
+                    type="checkbox"
+                    checked={consent}
+                    onChange={(e) => setConsent(e.target.checked)}
+                  />
+                  <label htmlFor="consent">
+                    I consent to my face data being stored and used for
+                    check-in. I have read the{" "}
+                    <a href={TERMS_URL} target="_blank" rel="noreferrer">
+                      Terms of Use
+                    </a>{" "}
+                    and{" "}
+                    <a href={PDPA_URL} target="_blank" rel="noreferrer">
+                      PDPA Notice
+                    </a>
+                    .
+                  </label>
+                </div>
+                <div className="row" style={{ marginTop: 18 }}>
+                  <button
+                    className="btn btn--lg"
+                    onClick={enroll}
+                    disabled={busy || !consent}
+                  >
+                    {busy ? "Saving…" : "Yes, save my face check-in"}
+                  </button>
+                  <button
+                    className="btn btn--ghost btn--lg"
+                    onClick={() => {
+                      setPhotoBlob(null);
+                      setConsent(false);
+                      setStep("ready");
+                      setCameraOpen(true);
+                    }}
+                  >
+                    Retake
+                  </button>
+                </div>
+              </>
+            )}
+
+            {step === "done" && (
               <button
-                type="button"
-                className="btn btn--ghost"
-                onClick={() => setPhotoBlob(null)}
+                className="btn btn--lg btn--block"
+                style={{ marginTop: 18 }}
+                onClick={resetAll}
               >
-                Remove
+                Register another person
               </button>
             )}
-          </div>
-          <FaceCapture
-            open={cameraOpen}
-            onClose={() => setCameraOpen(false)}
-            onCapture={setPhotoBlob}
-            onError={setCameraError}
-          />
-        </fieldset>
+          </>
+        )}
 
-        {/* ---- Consent ---- */}
-        <div className="checkbox-row">
-          <input
-            id="consent"
-            type="checkbox"
-            checked={consent}
-            onChange={(e) => setConsent(e.target.checked)}
-          />
-          <label htmlFor="consent" style={{ margin: 0, fontWeight: 400 }}>
-            I consent to my face data being stored and used for check-in.
-          </label>
-        </div>
-
-        <button
-          className="btn btn--lg btn--block"
-          style={{ marginTop: 18 }}
-          onClick={submit}
-          disabled={busy}
-        >
-          {busy ? "Registering…" : "Register"}
-        </button>
+        <FaceCapture
+          open={cameraOpen}
+          onClose={() => setCameraOpen(false)}
+          onCapture={handleCapture}
+          onError={(msg) => setError(msg)}
+        />
       </div>
     </main>
   );
