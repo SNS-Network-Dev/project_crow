@@ -30,7 +30,6 @@ const MIN_FACE = 0.2; // bbox height fraction — smaller => "come closer"
 const MAX_FACE = 0.72; // larger => "lean back"
 const HOLD_MS = 2500; // continuous alignment required before auto-capture
 const DETECT_INTERVAL_MS = 90; // ~11 detections/sec is plenty for alignment
-const DONE_RESET_MS = 3800; // hands-free return to live after a check-in
 
 export default function CheckinKiosk() {
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -46,13 +45,24 @@ export default function CheckinKiosk() {
   const [started, setStarted] = useState(false);
   const [camError, setCamError] = useState<CamError>(null);
   const [phase, setPhase] = useState<Phase>("live");
-  const [ring, setRing] = useState<{ state: RingState; hint: string; count: number }>({
+  const [ring, setRing] = useState<{
+    state: RingState;
+    hint: string;
+    count: number;
+  }>({
     state: "search",
     hint: "Position your face in the circle",
     count: 0,
   });
-  const [doneInfo, setDoneInfo] = useState<{ name: string; full_company_name: string | null } | null>(null);
-  const [alreadyInfo, setAlreadyInfo] = useState<{ name: string; checked_in_at: string } | null>(null);
+  const [doneInfo, setDoneInfo] = useState<{
+    name: string;
+    full_company_name: string | null;
+  } | null>(null);
+  const [alreadyInfo, setAlreadyInfo] = useState<{
+    name: string;
+    full_company_name: string | null;
+    checked_in_at: string;
+  } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [resetCountdown, setResetCountdown] = useState(10);
   const resetCountdownRef = useRef(10);
@@ -76,7 +86,11 @@ export default function CheckinKiosk() {
     setAlreadyInfo(null);
     resetCountdownRef.current = 10;
     setResetCountdown(10);
-    setRing({ state: "search", hint: "Position your face in the circle", count: 0 });
+    setRing({
+      state: "search",
+      hint: "Position your face in the circle",
+      count: 0,
+    });
     setPhase("live");
   }, []);
 
@@ -87,7 +101,10 @@ export default function CheckinKiosk() {
         const res = await fetch(`${BASE_PATH}/api/confirm`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ person_id: candidate.person_id, score: candidate.score }),
+          body: JSON.stringify({
+            person_id: candidate.person_id,
+            score: candidate.score,
+          }),
         });
         const b = (await res.json().catch(() => ({}))) as {
           ok?: boolean;
@@ -106,11 +123,14 @@ export default function CheckinKiosk() {
         if (b.alreadyCheckedIn) {
           setAlreadyInfo({
             name: b.name ?? candidate.name,
+            full_company_name:
+              b.full_company_name ?? candidate.full_company_name,
             checked_in_at: b.checked_in_at ?? "",
           });
           setPhase("already");
           phaseRef.current = "already";
-          window.setTimeout(backToLive, DONE_RESET_MS);
+          resetCountdownRef.current = 10;
+          setResetCountdown(10);
           return;
         }
         setDoneInfo({
@@ -123,16 +143,17 @@ export default function CheckinKiosk() {
         setError("Network error recording check-in.");
       }
     },
-    [backToLive],
+    [],
   );
 
   useEffect(() => {
     onMatchedRef.current = onMatched;
   }, [onMatched]);
 
-  // 10-second countdown on the success screen; auto-returns to live detection.
+  // 10-second countdown on the success / already-checked-in screens;
+  // auto-returns to live detection so the kiosk is ready for the next guest.
   useEffect(() => {
-    if (phase !== "done") return;
+    if (phase !== "done" && phase !== "already") return;
     let remaining = resetCountdownRef.current;
     const interval = window.setInterval(() => {
       remaining -= 1;
@@ -149,13 +170,20 @@ export default function CheckinKiosk() {
   const start = useCallback(async () => {
     setError(null);
     setCamError(null);
-    if (typeof navigator === "undefined" || !navigator.mediaDevices?.getUserMedia) {
+    if (
+      typeof navigator === "undefined" ||
+      !navigator.mediaDevices?.getUserMedia
+    ) {
       setCamError("insecure");
       return;
     }
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: "user", width: { ideal: 1280 }, height: { ideal: 960 } },
+        video: {
+          facingMode: "user",
+          width: { ideal: 1280 },
+          height: { ideal: 960 },
+        },
       });
       streamRef.current = stream;
       const video = videoRef.current;
@@ -169,8 +197,10 @@ export default function CheckinKiosk() {
       }
     } catch (e) {
       const name = (e as DOMException)?.name;
-      if (name === "NotAllowedError" || name === "SecurityError") setCamError("denied");
-      else if (name === "NotFoundError" || name === "OverconstrainedError") setCamError("notfound");
+      if (name === "NotAllowedError" || name === "SecurityError")
+        setCamError("denied");
+      else if (name === "NotFoundError" || name === "OverconstrainedError")
+        setCamError("notfound");
       else setCamError("other");
       return;
     }
@@ -178,10 +208,15 @@ export default function CheckinKiosk() {
 
     // Load the face detector lazily; if it fails, the kiosk still works via manual tap.
     try {
-      const { FilesetResolver, FaceDetector } = await import("@mediapipe/tasks-vision");
-      const fileset = await FilesetResolver.forVisionTasks(`${BASE_PATH}/mediapipe/wasm`);
+      const { FilesetResolver, FaceDetector } =
+        await import("@mediapipe/tasks-vision");
+      const fileset = await FilesetResolver.forVisionTasks(
+        `${BASE_PATH}/mediapipe/wasm`,
+      );
       detectorRef.current = await FaceDetector.createFromOptions(fileset, {
-        baseOptions: { modelAssetPath: `${BASE_PATH}/mediapipe/blaze_face_short_range.tflite` },
+        baseOptions: {
+          modelAssetPath: `${BASE_PATH}/mediapipe/blaze_face_short_range.tflite`,
+        },
         runningMode: "VIDEO",
         minDetectionConfidence: 0.5,
       });
@@ -226,7 +261,10 @@ export default function CheckinKiosk() {
           try {
             const fd = new FormData();
             fd.append("frame", blob, "frame.jpg");
-            const res = await fetch(`${BASE_PATH}/api/checkin`, { method: "POST", body: fd });
+            const res = await fetch(`${BASE_PATH}/api/checkin`, {
+              method: "POST",
+              body: fd,
+            });
             if (!res.ok) {
               const b = await res.json().catch(() => ({}));
               setError(b.error ?? "Check-in failed. Try again.");
@@ -242,7 +280,8 @@ export default function CheckinKiosk() {
             }
             // Pick the confident (best) match, or the highest score if none is flagged.
             const bestMatch =
-              list.find((c) => c.confident) ?? list.reduce((a, c) => (c.score > a.score ? c : a), list[0]);
+              list.find((c) => c.confident) ??
+              list.reduce((a, c) => (c.score > a.score ? c : a), list[0]);
             onMatchedRef.current(bestMatch);
           } catch {
             setError("Network error. Try again.");
@@ -261,7 +300,8 @@ export default function CheckinKiosk() {
       const video = videoRef.current;
       const detector = detectorRef.current;
       if (phaseRef.current !== "live" || capturingRef.current) return;
-      if (!video || video.readyState < 2 || !video.videoWidth || !detector) return;
+      if (!video || video.readyState < 2 || !video.videoWidth || !detector)
+        return;
 
       const now = performance.now();
       if (now - lastDetectRef.current < DETECT_INTERVAL_MS) return;
@@ -275,7 +315,12 @@ export default function CheckinKiosk() {
       }
       const vw = video.videoWidth;
       const vh = video.videoHeight;
-      let best: { originX: number; originY: number; width: number; height: number } | null = null;
+      let best: {
+        originX: number;
+        originY: number;
+        width: number;
+        height: number;
+      } | null = null;
       let bestArea = 0;
       for (const d of result?.detections ?? []) {
         const bb = d.boundingBox;
@@ -301,7 +346,10 @@ export default function CheckinKiosk() {
       let hint = "Center your face";
       if (sizeH < MIN_FACE) hint = "Come a little closer";
       else if (sizeH > MAX_FACE) hint = "Lean back a little";
-      else if (Math.abs(cx - 0.5) > CENTER_TOL || Math.abs(cy - 0.5) > CENTER_TOL)
+      else if (
+        Math.abs(cx - 0.5) > CENTER_TOL ||
+        Math.abs(cy - 0.5) > CENTER_TOL
+      )
         hint = "Center your face";
       else aligned = true;
 
@@ -338,7 +386,8 @@ export default function CheckinKiosk() {
   if (camError) {
     const messages: Record<NonNullable<CamError>, string> = {
       insecure: "Camera needs HTTPS or localhost.",
-      denied: "Camera permission was denied. Allow it in the browser and reload.",
+      denied:
+        "Camera permission was denied. Allow it in the browser and reload.",
       notfound: "No camera found on this device.",
       other: "Could not start the camera.",
     };
@@ -356,7 +405,13 @@ export default function CheckinKiosk() {
 
   return (
     <div className="kiosk-stage">
-      <video ref={videoRef} className="kiosk-video" playsInline muted autoPlay />
+      <video
+        ref={videoRef}
+        className="kiosk-video"
+        playsInline
+        muted
+        autoPlay
+      />
 
       <Link href={homeHref} className="kiosk-home" aria-label="Home">
         <span className="kiosk-x" aria-hidden />
@@ -367,7 +422,9 @@ export default function CheckinKiosk() {
         <div className="kiosk-overlay kiosk-overlay--center">
           <div className="kiosk-card">
             <h1>Check in</h1>
-            <p className="subtitle">Tap to start, then line up your face in the circle.</p>
+            <p className="subtitle">
+              Tap to start, then line up your face in the circle.
+            </p>
             <button className="btn btn--lg btn--block" onClick={start}>
               Start check-in
             </button>
@@ -379,10 +436,14 @@ export default function CheckinKiosk() {
       {started && phase === "live" && (
         <div className="kiosk-overlay">
           <div className={`face-ring face-ring--${ring.state}`}>
-            {ring.state === "aligned" && <span className="kiosk-count">{ring.count}</span>}
+            {ring.state === "aligned" && (
+              <span className="kiosk-count">{ring.count}</span>
+            )}
           </div>
           <p className="kiosk-instruction">{ring.hint}</p>
-          {error && <div className="notice notice--error kiosk-toast">{error}</div>}
+          {error && (
+            <div className="notice notice--error kiosk-toast">{error}</div>
+          )}
         </div>
       )}
 
@@ -399,20 +460,28 @@ export default function CheckinKiosk() {
       {/* ---- done ---- */}
       {phase === "done" && doneInfo && (
         <div className="kiosk-overlay kiosk-overlay--center">
-          <div className="kiosk-card kiosk-card--ok" style={{ textAlign: "center" }}>
+          <div
+            className="kiosk-card kiosk-card--ok"
+            style={{ textAlign: "center" }}
+          >
             <div className="kiosk-check" aria-hidden>
               <span className="kiosk-checkmark" />
             </div>
             <h1>Welcome, {doneInfo.name}!</h1>
             {doneInfo.full_company_name && (
-              <p className="subtitle" style={{ fontSize: "1.25rem", fontWeight: 500 }}>
+              <p
+                className="subtitle"
+                style={{ fontSize: "1.25rem", fontWeight: 500 }}
+              >
                 {doneInfo.full_company_name}
               </p>
             )}
             <p className="muted">You&apos;re checked in.</p>
-            <button className="btn btn--lg btn--block" onClick={backToLive}>
-              Start again {resetCountdown > 0 && `(${resetCountdown})`}
-            </button>
+            <div className="kiosk-success-actions">
+              <button className="btn btn--lg btn--block" onClick={backToLive}>
+                Start again {resetCountdown > 0 && `(${resetCountdown})`}
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -420,20 +489,42 @@ export default function CheckinKiosk() {
       {/* ---- already checked in ---- */}
       {phase === "already" && alreadyInfo && (
         <div className="kiosk-overlay kiosk-overlay--center">
-          <div className="kiosk-card kiosk-card--warn" style={{ textAlign: "center" }}>
-            <h1>{alreadyInfo.name}</h1>
-            <p className="subtitle">
-              Already checked in
+          <div
+            className="kiosk-card kiosk-card--ok"
+            style={{ textAlign: "center" }}
+          >
+            <div className="kiosk-check" aria-hidden>
+              <span className="kiosk-checkmark" />
+            </div>
+            <h1>Welcome, {alreadyInfo.name}!</h1>
+            {alreadyInfo.full_company_name && (
+              <p
+                className="subtitle"
+                style={{ fontSize: "1.25rem", fontWeight: 500 }}
+              >
+                {alreadyInfo.full_company_name}
+              </p>
+            )}
+            <p className="muted">
+              You&apos;re already checked in
               {alreadyInfo.checked_in_at
-                ? ` · ${new Date(alreadyInfo.checked_in_at).toLocaleString()}`
+                ? ` · ${new Date(alreadyInfo.checked_in_at).toLocaleString(
+                    "en-US",
+                    {
+                      year: "numeric",
+                      month: "numeric",
+                      day: "numeric",
+                      hour: "numeric",
+                      minute: "2-digit",
+                    },
+                  )}`
                 : ""}
             </p>
-            <p className="muted" style={{ marginTop: 6 }}>
-              Each guest can only check in once.
-            </p>
-            <button className="btn btn--lg btn--block" onClick={backToLive} style={{ marginTop: 12 }}>
-              Next guest
-            </button>
+            <div className="kiosk-success-actions">
+              <button className="btn btn--lg btn--block" onClick={backToLive}>
+                Start again {resetCountdown > 0 && `(${resetCountdown})`}
+              </button>
+            </div>
           </div>
         </div>
       )}

@@ -11,7 +11,10 @@ export async function POST(request: Request) {
   const score = Number.isFinite(scoreRaw) ? scoreRaw : 0;
 
   if (!Number.isInteger(personId) || personId <= 0) {
-    return NextResponse.json({ error: "person_id is required." }, { status: 400 });
+    return NextResponse.json(
+      { error: "person_id is required." },
+      { status: 400 },
+    );
   }
 
   const person = await getPerson(personId);
@@ -28,6 +31,7 @@ export async function POST(request: Request) {
       ok: false,
       alreadyCheckedIn: true,
       name: person.name,
+      full_company_name: person.full_company_name,
       checked_in_at: existing.checked_in_at,
     });
   }

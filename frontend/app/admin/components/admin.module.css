@@ -255,7 +255,8 @@
   color: var(--text);
 }
 
-.colTime {
+.colTime,
+.colRegistered {
   white-space: nowrap;
 }
 
@@ -274,7 +275,8 @@
   .colCompany,
   .colDesignation,
   .colInvited,
-  .colRemarks {
+  .colRemarks,
+  .colRegistered {
     display: none;
   }
 }

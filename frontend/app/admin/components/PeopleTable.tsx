@@ -53,8 +53,8 @@ export default function PeopleTable({
     return rows.filter((p) => {
       const hay =
         `${p.name} ${p.email ?? ""} ${p.full_company_name ?? ""} ${p.designation ?? ""} ${
-          p.remarks ?? ""
-        }`.toLowerCase();
+          p.invited_by ?? ""
+        } ${p.remarks ?? ""}`.toLowerCase();
       return hay.includes(q);
     });
   }, [people, checkedInIds, checkedInFilter, search]);
@@ -79,13 +79,15 @@ export default function PeopleTable({
               <th>Full Name</th>
               <th className={styles.colCompany}>Company</th>
               <th className={styles.colRemarks}>Remarks</th>
+              <th className={styles.colInvited}>Invited by</th>
+              <th className={styles.colRegistered}>Registered when</th>
               <th className="td-qr">QR</th>
             </tr>
           </thead>
           <tbody>
             {filtered.length === 0 && (
               <tr>
-                <td colSpan={7} className={styles.emptyRow}>
+                <td colSpan={9} className={styles.emptyRow}>
                   No guests match this search.
                 </td>
               </tr>
@@ -119,6 +121,16 @@ export default function PeopleTable({
                   title={p.remarks ?? undefined}
                 >
                   {p.remarks ?? DASH}
+                </td>
+                <td className={styles.colInvited}>{p.invited_by ?? DASH}</td>
+                <td className={styles.colRegistered}>
+                  {new Date(p.created_at).toLocaleString("en-US", {
+                    year: "numeric",
+                    month: "numeric",
+                    day: "numeric",
+                    hour: "numeric",
+                    minute: "2-digit",
+                  })}
                 </td>
                 <td className="td-qr" title={p.qr_code_path ?? undefined}>
                   {p.qr_code_path ?? DASH}

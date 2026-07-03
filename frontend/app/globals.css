@@ -27,7 +27,13 @@ body {
   min-height: 100%;
   color: var(--text);
   background: var(--bg);
-  font-family: var(--font-inter, system-ui), -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+  font-family:
+    var(--font-inter, system-ui),
+    -apple-system,
+    "Segoe UI",
+    Roboto,
+    Arial,
+    sans-serif;
   font-feature-settings: "cv02", "cv03", "cv04", "cv11";
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
@@ -672,7 +678,9 @@ th {
   height: 100%;
   object-fit: cover;
   background: #000;
-  transform: scaleX(-1); /* natural mirror for the user; capture uses the raw frame */
+  transform: scaleX(
+    -1
+  ); /* natural mirror for the user; capture uses the raw frame */
 }
 
 .kiosk-home {
@@ -702,7 +710,8 @@ th {
   justify-content: center;
   gap: 22px;
   text-align: center;
-  padding: calc(env(safe-area-inset-top) + 16px) 16px calc(env(safe-area-inset-bottom) + 16px);
+  padding: calc(env(safe-area-inset-top) + 16px) 16px
+    calc(env(safe-area-inset-bottom) + 16px);
 }
 .kiosk-overlay--center {
   background: rgba(0, 0, 0, 0.45);
@@ -767,6 +776,13 @@ th {
 }
 .kiosk-actions .btn {
   min-width: 240px;
+}
+
+.kiosk-success-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 28px;
 }
 
 .kiosk-card {
@@ -872,7 +888,9 @@ th {
   top: 0;
   height: 100vh;
   overflow: hidden;
-  transition: width 200ms ease, flex-basis 200ms ease;
+  transition:
+    width 200ms ease,
+    flex-basis 200ms ease;
   z-index: 30;
 }
 
@@ -951,7 +969,9 @@ th {
   border-radius: 8px;
   color: var(--muted);
   cursor: pointer;
-  transition: background 0.12s, color 0.12s;
+  transition:
+    background 0.12s,
+    color 0.12s;
 }
 
 .sidebarToggle:hover {
@@ -982,7 +1002,9 @@ th {
   font-size: 0.9rem;
   font-weight: 500;
   white-space: nowrap;
-  transition: background 0.12s, color 0.12s;
+  transition:
+    background 0.12s,
+    color 0.12s;
 }
 
 .navItem:hover {
@@ -1265,8 +1287,14 @@ th {
   animation: loginFadeIn 0.6s ease-out;
 }
 @keyframes loginFadeIn {
-  from { opacity: 0; transform: translateY(20px); }
-  to   { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 .loginLogo {
   width: 48px;
@@ -1313,7 +1341,9 @@ th {
   background: #fff;
   border: 1px solid #d1d5db;
   border-radius: 10px;
-  transition: border-color 0.15s, box-shadow 0.15s;
+  transition:
+    border-color 0.15s,
+    box-shadow 0.15s;
 }
 .loginInput:focus {
   outline: none;
