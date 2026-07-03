@@ -92,29 +92,76 @@ export async function checkin(frame: Blob): Promise<BMCandidate[]> {
  * (canonically 1024x1536). The bridge then composites it onto the event template.
  * Generation is slow, so we allow a generous timeout via AbortSignal.
  */
-export async function generateAvatar(
-  photo: Blob,
-  opts?: { style?: string; seed?: number; timeoutMs?: number },
-): Promise<Buffer> {
-  const fd = new FormData();
-  fd.append("photo", photo, "photo.jpg");
-  if (opts?.style) fd.append("style", opts.style);
-  if (opts?.seed != null) fd.append("seed", String(opts.seed));
+/** One generated figure image (already base64-decoded). `variant`/`seed` present on
+ *  multi-variant `/kelvin` responses so the UI can label + reproduce a pose. */
+export interface AvatarImage {
+  image: Buffer;
+  variant?: string; // "arm-around" | "pose-follow" (kelvin variants only)
+  seed?: number;
+}
 
-  const res = await bm("/avatar/generate", {
-    method: "POST",
-    body: fd,
-    signal: AbortSignal.timeout(opts?.timeoutMs ?? 120_000),
-  });
-  // 422 (QC: no/multiple person), 400 (decode/unknown style), 413 (too large) carry
-  // an end-user-safe message; surface them as BMAvatarError.
+// Shared decode of the avatar envelopes (see AVATAR_API_HANDOFF.md): either a single
+// `{ image, ... }` or a multi-variant `{ images: [{ image, variant, seed }, ... ] }`.
+async function parseAvatarResponse(res: Response, path: string): Promise<AvatarImage[]> {
+  // 422 (QC), 400 (decode), 413 (too large) carry an end-user-safe message.
   if (res.status === 422 || res.status === 400 || res.status === 413) {
     const body = await res.json().catch(() => ({ error: "Generation failed." }));
     throw new BMAvatarError(body.error ?? "Generation failed.");
   }
-  if (!res.ok) throw new Error(`baremetal /avatar/generate ${res.status}`);
-  const body = (await res.json()) as { image: string };
-  return Buffer.from(body.image, "base64");
+  if (!res.ok) throw new Error(`baremetal ${path} ${res.status}`);
+  const body = (await res.json()) as
+    | { image: string; variant?: string; seed?: number }
+    | { images: { image: string; variant?: string; seed?: number }[] };
+  const items = "images" in body ? body.images : [body];
+  return items.map((it) => ({
+    image: Buffer.from(it.image, "base64"),
+    variant: it.variant,
+    seed: it.seed,
+  }));
+}
+
+/**
+ * `/avatar/kelvin` (alias `/generate`) — one guest posed WITH Mr Kelvin.
+ * `variants` 1–4: 1 returns a single image; >1 returns several poses to choose from
+ * (1 "arm-around" + the rest "pose-follow" that mirror the guest's own gesture).
+ */
+export async function generateKelvin(
+  photo: Blob,
+  opts?: { variants?: number; seed?: number; timeoutMs?: number },
+): Promise<AvatarImage[]> {
+  const fd = new FormData();
+  fd.append("photo", photo, "photo.jpg");
+  if (opts?.seed != null) fd.append("seed", String(opts.seed));
+  const variants = Math.min(4, Math.max(1, opts?.variants ?? 1));
+  if (variants > 1) fd.append("variants", String(variants));
+
+  const res = await bm("/avatar/kelvin", {
+    method: "POST",
+    body: fd,
+    signal: AbortSignal.timeout(opts?.timeoutMs ?? 120_000),
+  });
+  return parseAvatarResponse(res, "/avatar/kelvin");
+}
+
+/**
+ * `/avatar/group` — a group photo (1–4 people) → side-by-side figurines. Set
+ * `kelvin` to append the fixed Mr Kelvin figure on the right.
+ */
+export async function generateGroup(
+  photo: Blob,
+  opts?: { kelvin?: boolean; seed?: number; timeoutMs?: number },
+): Promise<AvatarImage[]> {
+  const fd = new FormData();
+  fd.append("photo", photo, "photo.jpg");
+  if (opts?.seed != null) fd.append("seed", String(opts.seed));
+  if (opts?.kelvin) fd.append("kelvin", "1");
+
+  const res = await bm("/avatar/group", {
+    method: "POST",
+    body: fd,
+    signal: AbortSignal.timeout(opts?.timeoutMs ?? 120_000),
+  });
+  return parseAvatarResponse(res, "/avatar/group");
 }
 
 export async function matrixAdd(personId: number, embedding: Buffer): Promise<void> {

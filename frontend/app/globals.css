@@ -242,6 +242,46 @@ button {
   border: 1px solid var(--border);
 }
 
+/* Pose chooser grid (kelvin variants). */
+.poster-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+  margin-top: 8px;
+}
+.poster-choice {
+  position: relative;
+  display: block;
+  padding: 0;
+  border: 2px solid var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+  background: #000;
+  cursor: pointer;
+  transition: border-color 0.15s;
+}
+.poster-choice:hover,
+.poster-choice:focus-visible {
+  border-color: var(--accent);
+}
+.poster-choice img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 1280 / 717;
+  object-fit: cover;
+}
+.poster-choice__tag {
+  position: absolute;
+  left: 8px;
+  bottom: 8px;
+  padding: 3px 8px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #fff;
+  background: rgba(0, 0, 0, 0.6);
+  border-radius: 999px;
+}
+
 /* Generating spinner. */
 .spinner {
   width: 44px;

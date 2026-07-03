@@ -3,23 +3,42 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { BASE_PATH } from "@/lib/basePath";
 
-// Event avatar flow: capture a full-body photo -> generate the stylized figure on the
-// GPU -> composite onto the fixed event template -> reveal the poster. The figure is
-// the only AI-generated part; the background, birthday-guy, text and logos are fixed
-// or composited deterministically by the bridge (see avatar-gen-contract.md).
+// Event avatar flow. Capture a photo -> GPU generates stylized figurine(s) -> the bridge
+// composites onto the fixed event poster -> reveal. Two modes (see AVATAR_API_HANDOFF.md):
+//   • "kelvin": one guest posed WITH Mr Kelvin; we request several poses and let the guest
+//     pick their favourite (1 arm-around + pose-follow takes that mirror the guest's gesture).
+//   • "group":  a group photo (up to 4 people) -> side-by-side figurines, optionally + Kelvin.
 
-type Phase = "camera" | "preview" | "generating" | "done";
+type Mode = "kelvin" | "group";
+type Phase = "camera" | "preview" | "generating" | "choose" | "done";
 type CamError = "insecure" | "denied" | "notfound" | "other" | null;
+
+interface Poster {
+  id: string;
+  url: string;
+  variant: string | null;
+  seed: number | null;
+}
+
+const KELVIN_VARIANTS = 4; // 1 arm-around + 3 pose-follow
+
+const VARIANT_LABEL: Record<string, string> = {
+  "arm-around": "Arm around",
+  "pose-follow": "Your pose",
+};
 
 export default function AvatarStudio() {
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
 
+  const [mode, setMode] = useState<Mode>("kelvin");
+  const [groupKelvin, setGroupKelvin] = useState(true);
   const [phase, setPhase] = useState<Phase>("camera");
   const [camError, setCamError] = useState<CamError>(null);
   const [photo, setPhoto] = useState<Blob | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
-  const [posterUrl, setPosterUrl] = useState<string | null>(null);
+  const [posters, setPosters] = useState<Poster[]>([]);
+  const [selected, setSelected] = useState<Poster | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   // Customizable copy (maps to template text ids: title, pioneer).
@@ -46,8 +65,6 @@ export default function AvatarStudio() {
         video.srcObject = stream;
         video.muted = true;
         video.playsInline = true;
-        // Same robust play path that fixed the check-in camera: play now if metadata
-        // is ready, and again once it loads (covers both event orderings).
         const tryPlay = () => video.play().catch(() => {});
         if (video.readyState >= 1) tryPlay();
         video.onloadedmetadata = tryPlay;
@@ -60,7 +77,6 @@ export default function AvatarStudio() {
     }
   }, []);
 
-  // Start the camera whenever we (re)enter the camera phase.
   useEffect(() => {
     if (phase === "camera") startCamera();
     return () => {
@@ -114,9 +130,13 @@ export default function AvatarStudio() {
     setPhase("generating");
     try {
       const fd = new FormData();
-      fd.append("photo", photo, "fullbody.jpg");
+      fd.append("photo", photo, "photo.jpg");
+      fd.append("mode", mode);
+      if (mode === "kelvin") fd.append("variants", String(KELVIN_VARIANTS));
+      if (mode === "group" && groupKelvin) fd.append("kelvin", "1");
       if (title.trim()) fd.append("text:title", title.trim());
       if (caption.trim()) fd.append("text:pioneer", caption.trim());
+
       const res = await fetch(`${BASE_PATH}/api/avatar`, { method: "POST", body: fd });
       const body = await res.json().catch(() => ({}));
       if (!res.ok) {
@@ -124,17 +144,29 @@ export default function AvatarStudio() {
         setPhase("preview");
         return;
       }
-      setPosterUrl(body.url as string);
-      setPhase("done");
+      const list = (body.posters ?? []) as Poster[];
+      if (list.length === 0) {
+        setError("No poster was produced. Try again.");
+        setPhase("preview");
+        return;
+      }
+      setPosters(list);
+      if (list.length === 1) {
+        setSelected(list[0]);
+        setPhase("done");
+      } else {
+        setPhase("choose");
+      }
     } catch {
       setError("Network error. Try again.");
       setPhase("preview");
     }
-  }, [photo, title, caption]);
+  }, [photo, mode, groupKelvin, title, caption]);
 
   const startOver = useCallback(() => {
     setPhotoBlob(null);
-    setPosterUrl(null);
+    setPosters([]);
+    setSelected(null);
     setError(null);
     setPhase("camera");
   }, [setPhotoBlob]);
@@ -155,7 +187,7 @@ export default function AvatarStudio() {
             Retry camera
           </button>
           <label className="btn btn--ghost" style={{ margin: 0, display: "inline-flex" }}>
-            Upload full-body photo
+            Upload photo
             <input
               type="file"
               accept="image/*"
@@ -173,22 +205,62 @@ export default function AvatarStudio() {
     return (
       <div className="panel" style={{ textAlign: "center" }}>
         <div className="spinner" aria-hidden />
-        <h2 style={{ marginBottom: 4 }}>Creating your figure…</h2>
-        <p className="subtitle">Striking a pose. This can take a moment.</p>
+        <h2 style={{ marginBottom: 4 }}>
+          {mode === "kelvin" ? "Creating your poses…" : "Creating your figurines…"}
+        </h2>
+        <p className="subtitle">
+          {mode === "kelvin"
+            ? "Mr Kelvin is striking a few poses with you. This takes ~30 seconds."
+            : "Turning everyone into figurines. This can take a moment."}
+        </p>
+      </div>
+    );
+  }
+
+  // ---- choose a pose (kelvin variants) ----
+  if (phase === "choose") {
+    return (
+      <div className="panel">
+        <h2 style={{ marginBottom: 4 }}>Pick your favourite</h2>
+        <p className="subtitle">Tap the pose you like best.</p>
+        <div className="poster-grid">
+          {posters.map((p) => (
+            <button
+              key={p.id}
+              className="poster-choice"
+              onClick={() => {
+                setSelected(p);
+                setPhase("done");
+              }}
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={p.url} alt={p.variant ?? "pose"} />
+              {p.variant && <span className="poster-choice__tag">{VARIANT_LABEL[p.variant] ?? p.variant}</span>}
+            </button>
+          ))}
+        </div>
+        <button className="btn btn--ghost btn--block" style={{ marginTop: 12 }} onClick={startOver}>
+          Retake
+        </button>
       </div>
     );
   }
 
   // ---- done ----
-  if (phase === "done" && posterUrl) {
+  if (phase === "done" && selected) {
     return (
       <div className="panel" style={{ textAlign: "center" }}>
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={posterUrl} alt="Your event poster" className="avatar-poster" />
+        <img src={selected.url} alt="Your event poster" className="avatar-poster" />
         <div className="row" style={{ justifyContent: "center", marginTop: 14 }}>
-          <a className="btn" href={posterUrl} download="event-poster.png">
+          <a className="btn" href={selected.url} download="event-poster.png">
             Download
           </a>
+          {posters.length > 1 && (
+            <button className="btn btn--ghost" onClick={() => setPhase("choose")}>
+              Pick another
+            </button>
+          )}
           <button className="btn btn--ghost" onClick={startOver}>
             Start over
           </button>
@@ -217,8 +289,22 @@ export default function AvatarStudio() {
           onChange={(e) => setCaption(e.target.value)}
         />
 
+        {mode === "group" && (
+          <div className="checkbox-row">
+            <input
+              id="groupKelvin"
+              type="checkbox"
+              checked={groupKelvin}
+              onChange={(e) => setGroupKelvin(e.target.checked)}
+            />
+            <label htmlFor="groupKelvin" style={{ margin: 0, fontWeight: 400 }}>
+              Add Mr Kelvin to the group
+            </label>
+          </div>
+        )}
+
         <button className="btn btn--lg btn--block" style={{ marginTop: 16 }} onClick={generate}>
-          Generate my poster
+          {mode === "kelvin" ? "Generate poses with Mr Kelvin" : "Generate group poster"}
         </button>
         <button className="btn btn--ghost btn--block" style={{ marginTop: 10 }} onClick={startOver}>
           Retake
@@ -230,12 +316,32 @@ export default function AvatarStudio() {
   // ---- camera (default) ----
   return (
     <div>
+      <div className="tab-bar" role="tablist">
+        <button
+          className={`tab ${mode === "kelvin" ? "tab--active" : ""}`}
+          onClick={() => setMode("kelvin")}
+        >
+          Me + Mr Kelvin
+        </button>
+        <button
+          className={`tab ${mode === "group" ? "tab--active" : ""}`}
+          onClick={() => setMode("group")}
+        >
+          Group photo
+        </button>
+      </div>
+
       <div className="video-shell video-shell--tall">
         <video ref={videoRef} playsInline muted autoPlay />
         <div className="bodyguide" aria-hidden>
-          <span>Stand back — fit your whole body in frame</span>
+          <span>
+            {mode === "kelvin"
+              ? "Stand back — fit your whole body in frame"
+              : "Fit everyone in frame (up to 4), standing, facing the camera"}
+          </span>
         </div>
       </div>
+
       {error && <div className="notice notice--error">{error}</div>}
       <button className="btn btn--lg btn--block" style={{ marginTop: 14 }} onClick={capture}>
         Capture
