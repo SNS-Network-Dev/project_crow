@@ -6,6 +6,7 @@ import { generateKelvin, generateGroup, BMAvatarError, type AvatarImage } from "
 import { loadTemplate } from "@/lib/avatarTemplate";
 import { composePoster } from "@/lib/avatarComposite";
 import { savePoster } from "@/lib/posters";
+import { appendSet } from "@/lib/gallery";
 import { config } from "@/lib/config";
 import { BASE_PATH } from "@/lib/basePath";
 
@@ -46,10 +47,10 @@ export async function POST(request: Request) {
   try {
     if (FAKE) {
       const ph = await readFile(resolve(config.avatarTemplateDir, "..", "samples", "figure.png"));
-      const n = mode === "group" ? 1 : variants;
+      const n = mode === "group" ? 3 : variants;
       results = Array.from({ length: n }, (_, i) => ({
         image: ph,
-        variant: mode === "group" ? undefined : i === 0 ? "arm-around" : "pose-follow",
+        variant: mode === "group" ? "group" : i === 0 ? "arm-around" : "pose-follow",
         seed: 1000 + i,
       }));
     } else if (mode === "group") {
@@ -67,7 +68,9 @@ export async function POST(request: Request) {
     );
   }
 
-  // 2) Composite each figure onto the fixed event template + persist.
+  // 2) Composite each figure onto the fixed event template + persist, then record
+  //    the finished set on the live wall (the gallery station polls for it; the
+  //    capture station itself only needs the ok/count to reset for the next guest).
   try {
     const { tpl, dir } = await loadTemplate(templateName);
     const posters = [];
@@ -82,7 +85,11 @@ export async function POST(request: Request) {
         seed: r.seed ?? null,
       });
     }
-    return NextResponse.json({ posters });
+    const set = await appendSet(
+      mode,
+      posters.map((p) => ({ id: p.id, variant: p.variant, seed: p.seed })),
+    );
+    return NextResponse.json({ ok: true, setId: set.id, count: posters.length, posters });
   } catch (e) {
     console.error("avatar composite failed:", e);
     return NextResponse.json({ error: "Could not build the poster." }, { status: 500 });

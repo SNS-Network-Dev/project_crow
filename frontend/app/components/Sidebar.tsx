@@ -8,7 +8,7 @@ import { useSyncExternalStore } from "react";
 import { BASE_PATH } from "@/lib/basePath";
 import { useAdminHome } from "./useAdminHome";
 
-type NavItem = { href: string; label: string; icon: ReactNode };
+type NavItem = { href: string; label: string; icon: ReactNode; exact?: boolean };
 
 // The sidebar mirrors aimy_chat's company_admin sidebar: a white→slate gradient
 // rail with lucide-style icon nav, a teal-tinted active state, and a sticky
@@ -39,7 +39,18 @@ const ADMIN_ITEMS: NavItem[] = [
   },
   {
     href: "/avatar",
-    label: "Avatar poster",
+    label: "Photo booth",
+    exact: true,
+    icon: (
+      <svg viewBox="0 0 24 24" width="16" height="16" {...stroke}>
+        <path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z" />
+        <circle cx="12" cy="13" r="3" />
+      </svg>
+    ),
+  },
+  {
+    href: "/avatar/gallery",
+    label: "Photo gallery",
     icon: (
       <svg viewBox="0 0 24 24" width="16" height="16" {...stroke}>
         <rect width="18" height="18" x="3" y="3" rx="2" ry="2" />
@@ -172,16 +183,16 @@ export default function Sidebar() {
     router.refresh();
   };
 
-  const isActive = (href: string) =>
-    pathname === href ||
-    (href !== "/" && !!pathname?.startsWith(href + "/")) ||
-    (href === "/checkin" && pathname === "/kiosk");
+  const isActive = (it: NavItem) =>
+    pathname === it.href ||
+    (!it.exact && it.href !== "/" && !!pathname?.startsWith(it.href + "/")) ||
+    (it.href === "/checkin" && pathname === "/kiosk");
 
   const renderItem = (it: NavItem) => (
     <Link
       key={it.href}
       href={it.href}
-      className={`navItem ${isActive(it.href) ? "navItem--active" : ""}`}
+      className={`navItem ${isActive(it) ? "navItem--active" : ""}`}
       title={collapsed ? it.label : undefined}
     >
       <span className="navIcon" aria-hidden>

@@ -26,14 +26,14 @@ everything the bridge needs; you do **not** need to know the internal pipeline.
   **`variants`** (optional int **1–4**, default 1).
 
 **Variants — let the attendee pick a pose.** With `variants>1` the endpoint returns several
-takes to choose from: **1 "arm-around"** (the classic, arms on shoulders) **+ (N-1) "pose-follow"**
-(the guest keeps their own hand gesture and Kelvin reacts/mirrors it; different seeds give
-different poses). The guest's face/identity is computed once and shared, so extra variants are
-cheap (~+5–6 s each). Latency: `variants=4` ≈ ~22–33 s warm.
+takes: **(N-1) "pose-follow"** first (the guest keeps their **own real gesture** — read from the
+photo by a vision model — and Kelvin reacts/mirrors it) **+ 1 "arm-around"** last (the classic,
+arms on shoulders). The guest's face is computed once and shared. Latency: `variants=4` ≈ ~35 s warm.
 
-- **`variants=1` (default) returns the legacy single-image envelope** (`image`, `width`, …).
-- **`variants>1` returns an `images[]` array** (see response section). The bridge shows them as
-  a chooser; each item has a `variant` label (`"arm-around"` | `"pose-follow"`) and its own `seed`.
+- **`variants=1` (default) returns the legacy single-image envelope** (`image`, `width`, …) —
+  that single image is the arm-around pose.
+- **`variants>1` returns an `images[]` array** (see response section). Order is
+  `[pose-follow × (N-1), arm-around]`; each item has a `variant` label and its own `seed`.
 
 ```bash
 # single (legacy)
@@ -42,17 +42,18 @@ curl -sk -X POST https://103.47.130.195/crow-api/api/avatar/kelvin -F photo=@gue
 curl -sk -X POST https://103.47.130.195/crow-api/api/avatar/kelvin -F photo=@guest.jpg -F variants=4
 ```
 
-### 2) `POST /group`  — group photo → figurines (NO Kelvin by default)
-- **1–4 people** expected in `photo`. Each person is converted independently and composited
-  side by side (same ground line), so the count and each identity are preserved.
-- Optional add-on: form field **`kelvin=1`** appends the fixed Mr Kelvin figure on the right.
-- Form fields: `photo` (required), `seed` (optional int), `kelvin` (optional `0`/`1`, default `0`).
+### 2) `POST /group`  — group photo → figurines, each keeping their own pose
+- **1–4 people** expected in `photo`. Each person is converted independently (so count +
+  identity are preserved) and composited side by side on the same ground line.
+- **Pose-preserving:** a vision model reads each person's gesture (left-to-right) and the
+  figurine strikes it (thumbs up, peace, arms crossed, hands on hips, arm raised, etc.).
+- **Returns an `images[]` array** (like `/kelvin` variants): **`variants` group pictures
+  (default 3) + 1 with Mr Kelvin appended** on the right. The bridge shows them as a chooser.
+- Form fields: `photo` (required), `seed` (optional int), `variants` (optional int, default 3).
 
 ```bash
-# group only
 curl -sk -X POST https://103.47.130.195/crow-api/api/avatar/group -F photo=@group.jpg
-# group + Kelvin
-curl -sk -X POST https://103.47.130.195/crow-api/api/avatar/group -F photo=@group.jpg -F kelvin=1
+# -> {"images":[{...,"variant":"group"},{...,"group"},{...,"group"},{...,"variant":"group+kelvin"}], "count":4}
 ```
 
 ### Health / readiness (ops)
@@ -105,10 +106,13 @@ reproduce/regenerate a specific pick later.
 
 | Call | Typical | Note |
 |---|---|---|
-| `/kelvin` (variants=1) | ~10–13 s | one guest + Kelvin |
-| `/kelvin` variants=4 | ~22–33 s | 1 arm-around + 3 pose-follow (face computed once, shared) |
-| `/group` 1 person | ~6 s | |
-| `/group` 3–4 people | ~20–30 s | scales ~ per person (each person = one generation pass) |
+| `/kelvin` (variants=1) | ~12 s | single arm-around image |
+| `/kelvin` variants=4 | ~35 s | 3 pose-follow + 1 arm-around |
+| `/group` 3 people (3 variants +kelvin) | ~50 s | scales with people × variants |
+| `/group` 4 people | ~60–75 s | lower `variants` to speed up |
+
+Pose reading uses the local Gemma-4 vision model (`:8085`); if it is down the figures fall
+back to a neutral standing pose (generation never fails).
 
 Keep the bridge's per-request timeout at **120 s** (unchanged). Generation is **serialized**
 on the GPU (one at a time); if more than a few requests queue, extras get `503` — retry.
