@@ -6,6 +6,7 @@ import { useEffect, useId, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { useSyncExternalStore } from "react";
 import { BASE_PATH } from "@/lib/basePath";
+import { useAdminHome } from "./useAdminHome";
 
 type NavItem = { href: string; label: string; icon: ReactNode };
 
@@ -126,6 +127,7 @@ export default function Sidebar() {
   const router = useRouter();
   const collapsed = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
   const isAdmin = useSyncExternalStore(adminSubscribe, adminSnapshot, adminServerSnapshot);
+  const homeHref = useAdminHome();
 
   const [menuOpen, setMenuOpen] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -192,7 +194,7 @@ export default function Sidebar() {
   return (
     <aside className={`sidebar ${collapsed ? "sidebar--collapsed" : ""}`}>
       <div className="sidebarHead">
-        <Link href="/" className="sidebarBrand" title="Project Crow">
+        <Link href={homeHref} className="sidebarBrand" title="Project Crow">
           <span className="sidebarBrandMark" aria-hidden>
             PC
           </span>

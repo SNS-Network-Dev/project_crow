@@ -33,5 +33,10 @@ export async function POST(request: Request) {
   }
 
   await logCheckin(personId, score);
-  return NextResponse.json({ ok: true, name: person.name, checked_in_at: new Date().toISOString() });
+  return NextResponse.json({
+    ok: true,
+    name: person.name,
+    full_company_name: person.full_company_name,
+    checked_in_at: new Date().toISOString(),
+  });
 }

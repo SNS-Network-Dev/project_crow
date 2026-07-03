@@ -1,7 +1,9 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import Link from "next/link";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { BASE_PATH } from "@/lib/basePath";
+import { useAdminHome } from "./useAdminHome";
 
 // Event avatar flow. Capture a photo -> GPU generates stylized figurine(s) -> the bridge
 // composites onto the fixed event poster -> reveal. Two modes (see AVATAR_API_HANDOFF.md):
@@ -44,6 +46,7 @@ export default function AvatarStudio() {
   // Customizable copy (maps to template text ids: title, pioneer).
   const [title, setTitle] = useState("It All Starts Here");
   const [caption, setCaption] = useState("");
+  const homeHref = useAdminHome();
 
   const stopCamera = useCallback(() => {
     streamRef.current?.getTracks().forEach((t) => t.stop());
@@ -171,6 +174,15 @@ export default function AvatarStudio() {
     setPhase("camera");
   }, [setPhotoBlob]);
 
+  const stage = (children: ReactNode) => (
+    <div style={{ position: "relative" }}>
+      <Link href={homeHref} className="kiosk-home" aria-label="Home">
+        <span className="kiosk-x" aria-hidden />
+      </Link>
+      {children}
+    </div>
+  );
+
   // ---- camera error ----
   if (camError) {
     const messages: Record<NonNullable<CamError>, string> = {
@@ -179,7 +191,7 @@ export default function AvatarStudio() {
       notfound: "No camera found on this device. Upload a photo instead.",
       other: "Could not start the camera. Upload a photo instead.",
     };
-    return (
+    return stage(
       <div className="panel">
         <div className="notice notice--error">{messages[camError]}</div>
         <div className="row">
@@ -196,13 +208,13 @@ export default function AvatarStudio() {
             />
           </label>
         </div>
-      </div>
+      </div>,
     );
   }
 
   // ---- generating ----
   if (phase === "generating") {
-    return (
+    return stage(
       <div className="panel" style={{ textAlign: "center" }}>
         <div className="spinner" aria-hidden />
         <h2 style={{ marginBottom: 4 }}>
@@ -213,13 +225,13 @@ export default function AvatarStudio() {
             ? "Mr Kelvin is striking a few poses with you. This takes ~30 seconds."
             : "Turning everyone into figurines. This can take a moment."}
         </p>
-      </div>
+      </div>,
     );
   }
 
   // ---- choose a pose (kelvin variants) ----
   if (phase === "choose") {
-    return (
+    return stage(
       <div className="panel">
         <h2 style={{ marginBottom: 4 }}>Pick your favourite</h2>
         <p className="subtitle">Tap the pose you like best.</p>
@@ -242,13 +254,13 @@ export default function AvatarStudio() {
         <button className="btn btn--ghost btn--block" style={{ marginTop: 12 }} onClick={startOver}>
           Retake
         </button>
-      </div>
+      </div>,
     );
   }
 
   // ---- done ----
   if (phase === "done" && selected) {
-    return (
+    return stage(
       <div className="panel" style={{ textAlign: "center" }}>
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src={selected.url} alt="Your event poster" className="avatar-poster" />
@@ -265,13 +277,13 @@ export default function AvatarStudio() {
             Start over
           </button>
         </div>
-      </div>
+      </div>,
     );
   }
 
   // ---- preview (confirm + customize) ----
   if (phase === "preview" && preview) {
-    return (
+    return stage(
       <div className="panel">
         {error && <div className="notice notice--error">{error}</div>}
         {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -309,12 +321,12 @@ export default function AvatarStudio() {
         <button className="btn btn--ghost btn--block" style={{ marginTop: 10 }} onClick={startOver}>
           Retake
         </button>
-      </div>
+      </div>,
     );
   }
 
   // ---- camera (default) ----
-  return (
+  return stage(
     <div>
       <div className="tab-bar" role="tablist">
         <button
@@ -358,6 +370,6 @@ export default function AvatarStudio() {
           onChange={(e) => onUpload(e.target.files?.[0] ?? null)}
         />
       </label>
-    </div>
+    </div>,
   );
 }

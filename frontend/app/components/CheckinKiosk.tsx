@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { FaceDetector as MPFaceDetector } from "@mediapipe/tasks-vision";
 import { BASE_PATH } from "@/lib/basePath";
+import { useAdminHome } from "./useAdminHome";
 
 // One unified, responsive check-in surface for BOTH phone (/checkin) and the iPad
 // kiosk (/kiosk). It fills the screen in any orientation, detects the face in-browser
@@ -14,27 +15,14 @@ import { BASE_PATH } from "@/lib/basePath";
 interface Candidate {
   person_id: number;
   name: string;
+  full_company_name: string | null;
   photo_url: string | null;
   score: number;
   confident: boolean;
 }
-interface Person {
-  id: number;
-  name: string;
-  email: string | null;
-  photo_url: string | null;
-}
-
-type Phase = "live" | "matching" | "results" | "done" | "already";
+type Phase = "live" | "matching" | "done" | "already";
 type CamError = "insecure" | "denied" | "notfound" | "other" | null;
 type RingState = "search" | "detect" | "aligned";
-
-function initials(name: string): string {
-  const parts = name.trim().split(/\s+/).filter(Boolean);
-  if (parts.length === 0) return "?";
-  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
-  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
-}
 
 // Alignment tuning (normalized to the video frame).
 const CENTER_TOL = 0.17; // how far off-center the face may be
@@ -56,7 +44,6 @@ export default function CheckinKiosk() {
   const statusKeyRef = useRef("");
 
   const [started, setStarted] = useState(false);
-  const [autoEnabled, setAutoEnabled] = useState(false);
   const [camError, setCamError] = useState<CamError>(null);
   const [phase, setPhase] = useState<Phase>("live");
   const [ring, setRing] = useState<{ state: RingState; hint: string; count: number }>({
@@ -64,13 +51,17 @@ export default function CheckinKiosk() {
     hint: "Position your face in the circle",
     count: 0,
   });
-  const [candidates, setCandidates] = useState<Candidate[] | null>(null);
-  const [doneName, setDoneName] = useState<string | null>(null);
+  const [doneInfo, setDoneInfo] = useState<{ name: string; full_company_name: string | null } | null>(null);
   const [alreadyInfo, setAlreadyInfo] = useState<{ name: string; checked_in_at: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [manual, setManual] = useState(false);
-  const [people, setPeople] = useState<Person[]>([]);
-  const [filter, setFilter] = useState("");
+  const [resetCountdown, setResetCountdown] = useState(10);
+  const resetCountdownRef = useRef(10);
+  const homeHref = useAdminHome();
+
+  // Callback ref so the detection loop can call the latest onMatched without
+  // being declared before it. This avoids the ESLint "accessed before declared"
+  // issue because the function is read from a ref, not closed over directly.
+  const onMatchedRef = useRef<(candidate: Candidate) => void>(() => {});
 
   useEffect(() => {
     phaseRef.current = phase;
@@ -80,14 +71,79 @@ export default function CheckinKiosk() {
     capturingRef.current = false;
     holdStartRef.current = 0;
     statusKeyRef.current = "";
-    setCandidates(null);
-    setManual(false);
+    setDoneInfo(null);
     setError(null);
-    setDoneName(null);
     setAlreadyInfo(null);
+    resetCountdownRef.current = 10;
+    setResetCountdown(10);
     setRing({ state: "search", hint: "Position your face in the circle", count: 0 });
     setPhase("live");
   }, []);
+
+  const onMatched = useCallback(
+    async (candidate: Candidate) => {
+      setError(null);
+      try {
+        const res = await fetch(`${BASE_PATH}/api/confirm`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ person_id: candidate.person_id, score: candidate.score }),
+        });
+        const b = (await res.json().catch(() => ({}))) as {
+          ok?: boolean;
+          alreadyCheckedIn?: boolean;
+          name?: string;
+          full_company_name?: string | null;
+          checked_in_at?: string;
+          error?: string;
+        };
+        if (!res.ok) {
+          setError(b.error ?? "Could not record check-in.");
+          return;
+        }
+        // One check-in per person: server reports a prior check-in instead of
+        // recording a duplicate. Notify the operator and return to live.
+        if (b.alreadyCheckedIn) {
+          setAlreadyInfo({
+            name: b.name ?? candidate.name,
+            checked_in_at: b.checked_in_at ?? "",
+          });
+          setPhase("already");
+          phaseRef.current = "already";
+          window.setTimeout(backToLive, DONE_RESET_MS);
+          return;
+        }
+        setDoneInfo({
+          name: b.name ?? candidate.name,
+          full_company_name: b.full_company_name ?? candidate.full_company_name,
+        });
+        setPhase("done");
+        phaseRef.current = "done";
+      } catch {
+        setError("Network error recording check-in.");
+      }
+    },
+    [backToLive],
+  );
+
+  useEffect(() => {
+    onMatchedRef.current = onMatched;
+  }, [onMatched]);
+
+  // 10-second countdown on the success screen; auto-returns to live detection.
+  useEffect(() => {
+    if (phase !== "done") return;
+    let remaining = resetCountdownRef.current;
+    const interval = window.setInterval(() => {
+      remaining -= 1;
+      setResetCountdown(remaining);
+      if (remaining <= 0) {
+        clearInterval(interval);
+        backToLive();
+      }
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [phase, backToLive]);
 
   // ---- one-time start: camera + detector (needs a user gesture on iOS) ----
   const start = useCallback(async () => {
@@ -129,9 +185,9 @@ export default function CheckinKiosk() {
         runningMode: "VIDEO",
         minDetectionConfidence: 0.5,
       });
-      setAutoEnabled(true);
     } catch {
-      setAutoEnabled(false); // manual-only fallback
+      // If MediaPipe fails, we still have the camera running; the user just won't
+      // see alignment feedback. The server will still try to match on capture.
     }
   }, []);
 
@@ -178,9 +234,16 @@ export default function CheckinKiosk() {
               return;
             }
             const b = (await res.json()) as { candidates: Candidate[] };
-            setCandidates(b.candidates ?? []);
-            setPhase("results");
-            phaseRef.current = "results";
+            const list = b.candidates ?? [];
+            if (list.length === 0) {
+              setError("No face matched. Please try again.");
+              backToLive();
+              return;
+            }
+            // Pick the confident (best) match, or the highest score if none is flagged.
+            const bestMatch =
+              list.find((c) => c.confident) ?? list.reduce((a, c) => (c.score > a.score ? c : a), list[0]);
+            onMatchedRef.current(bestMatch);
           } catch {
             setError("Network error. Try again.");
             backToLive();
@@ -271,65 +334,6 @@ export default function CheckinKiosk() {
     };
   }, []);
 
-  const confirm = useCallback(
-    async (personId: number, score: number, name: string) => {
-      setError(null);
-      try {
-        const res = await fetch(`${BASE_PATH}/api/confirm`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ person_id: personId, score }),
-        });
-        const b = (await res.json().catch(() => ({}))) as {
-          ok?: boolean;
-          alreadyCheckedIn?: boolean;
-          name?: string;
-          checked_in_at?: string;
-          error?: string;
-        };
-        if (!res.ok) {
-          setError(b.error ?? "Could not record check-in.");
-          return;
-        }
-        // One check-in per person: server reports a prior check-in instead of
-        // recording a duplicate. Notify the operator and return to live.
-        if (b.alreadyCheckedIn) {
-          setAlreadyInfo({
-            name: b.name ?? name,
-            checked_in_at: b.checked_in_at ?? "",
-          });
-          setCandidates(null);
-          setManual(false);
-          setPhase("already");
-          phaseRef.current = "already";
-          window.setTimeout(backToLive, DONE_RESET_MS);
-          return;
-        }
-        setDoneName(name);
-        setCandidates(null);
-        setManual(false);
-        setPhase("done");
-        phaseRef.current = "done";
-        window.setTimeout(backToLive, DONE_RESET_MS);
-      } catch {
-        setError("Network error recording check-in.");
-      }
-    },
-    [backToLive],
-  );
-
-  const openManual = useCallback(async () => {
-    setManual(true);
-    setFilter("");
-    try {
-      const res = await fetch(`${BASE_PATH}/api/people`);
-      const b = (await res.json()) as { people: Person[] };
-      setPeople(b.people ?? []);
-    } catch {
-      setError("Could not load the people list.");
-    }
-  }, []);
-
   // ---- camera error ----
   if (camError) {
     const messages: Record<NonNullable<CamError>, string> = {
@@ -354,7 +358,7 @@ export default function CheckinKiosk() {
     <div className="kiosk-stage">
       <video ref={videoRef} className="kiosk-video" playsInline muted autoPlay />
 
-      <Link href="/" className="kiosk-home" aria-label="Home">
+      <Link href={homeHref} className="kiosk-home" aria-label="Home">
         <span className="kiosk-x" aria-hidden />
       </Link>
 
@@ -379,23 +383,6 @@ export default function CheckinKiosk() {
           </div>
           <p className="kiosk-instruction">{ring.hint}</p>
           {error && <div className="notice notice--error kiosk-toast">{error}</div>}
-          <div className="kiosk-actions">
-            <button className="btn btn--lg" onClick={() => captureRef.current()}>
-              {autoEnabled ? "Tap to capture" : "Capture"}
-            </button>
-            <button className="btn btn--ghost" onClick={openManual}>
-              Enter name instead
-            </button>
-          </div>
-          {manual && (
-            <ManualPicker
-              people={people}
-              filter={filter}
-              setFilter={setFilter}
-              onPick={(p) => confirm(p.id, 0, p.name)}
-              onClose={() => setManual(false)}
-            />
-          )}
         </div>
       )}
 
@@ -409,77 +396,22 @@ export default function CheckinKiosk() {
         </div>
       )}
 
-      {/* ---- results ---- */}
-      {phase === "results" && candidates && (
-        <div className="kiosk-overlay kiosk-overlay--center">
-          <div className="kiosk-card">
-            {candidates.length === 0 && !manual ? (
-              <div className="notice notice--error">
-                No face matched. Move into frame and retry, or pick your name.
-              </div>
-            ) : (
-              !manual && (
-                <>
-                  <h2>Tap your name</h2>
-                  <div className="candidates">
-                    {candidates.map((c) => (
-                      <button
-                        key={c.person_id}
-                        className={`candidate ${c.confident ? "candidate--confident" : ""}`}
-                        onClick={() => confirm(c.person_id, c.score, c.name)}
-                      >
-                        {c.photo_url ? (
-                          // eslint-disable-next-line @next/next/no-img-element
-                          <img src={c.photo_url} alt={c.name} />
-                        ) : (
-                          <span className="avatar">{initials(c.name)}</span>
-                        )}
-                        <span className="meta">
-                          <span className="name">{c.name}</span>
-                          <span className="score"> match {(c.score * 100).toFixed(0)}%</span>
-                        </span>
-                        {c.confident && <span className="badge">BEST</span>}
-                      </button>
-                    ))}
-                  </div>
-                </>
-              )
-            )}
-            {manual && (
-              <ManualPicker
-                people={people}
-                filter={filter}
-                setFilter={setFilter}
-                onPick={(p) => confirm(p.id, 0, p.name)}
-                onClose={() => setManual(false)}
-              />
-            )}
-            {error && <div className="notice notice--error">{error}</div>}
-            <div className="row" style={{ marginTop: 14 }}>
-              <button className="btn" onClick={backToLive}>
-                Retry
-              </button>
-              {!manual && (
-                <button className="btn btn--ghost" onClick={openManual}>
-                  None of these / enter name
-                </button>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* ---- done ---- */}
-      {phase === "done" && doneName && (
+      {phase === "done" && doneInfo && (
         <div className="kiosk-overlay kiosk-overlay--center">
           <div className="kiosk-card kiosk-card--ok" style={{ textAlign: "center" }}>
             <div className="kiosk-check" aria-hidden>
               <span className="kiosk-checkmark" />
             </div>
-            <h1>Welcome, {doneName}!</h1>
-            <p className="subtitle">You&apos;re checked in.</p>
+            <h1>Welcome, {doneInfo.name}!</h1>
+            {doneInfo.full_company_name && (
+              <p className="subtitle" style={{ fontSize: "1.25rem", fontWeight: 500 }}>
+                {doneInfo.full_company_name}
+              </p>
+            )}
+            <p className="muted">You&apos;re checked in.</p>
             <button className="btn btn--lg btn--block" onClick={backToLive}>
-              Next guest
+              Start again {resetCountdown > 0 && `(${resetCountdown})`}
             </button>
           </div>
         </div>
@@ -505,59 +437,6 @@ export default function CheckinKiosk() {
           </div>
         </div>
       )}
-    </div>
-  );
-}
-
-function ManualPicker({
-  people,
-  filter,
-  setFilter,
-  onPick,
-  onClose,
-}: {
-  people: Person[];
-  filter: string;
-  setFilter: (s: string) => void;
-  onPick: (p: Person) => void;
-  onClose: () => void;
-}) {
-  const f = filter.trim().toLowerCase();
-  const shown = f
-    ? people.filter(
-        (p) => p.name.toLowerCase().includes(f) || (p.email ?? "").toLowerCase().includes(f),
-      )
-    : people;
-  return (
-    <div className="manual">
-      <input
-        className="search"
-        type="text"
-        placeholder="Search your name…"
-        value={filter}
-        onChange={(e) => setFilter(e.target.value)}
-        autoFocus
-      />
-      <div className="candidates">
-        {shown.slice(0, 50).map((p) => (
-          <button key={p.id} className="candidate" onClick={() => onPick(p)}>
-            {p.photo_url ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={p.photo_url} alt={p.name} />
-            ) : (
-              <span className="avatar">{initials(p.name)}</span>
-            )}
-            <span className="meta">
-              <span className="name">{p.name}</span>
-              {p.email && <span className="score"> {p.email}</span>}
-            </span>
-          </button>
-        ))}
-        {shown.length === 0 && <p className="muted">No matching people.</p>}
-      </div>
-      <button className="btn btn--ghost" onClick={onClose} style={{ marginTop: 10 }}>
-        Back
-      </button>
     </div>
   );
 }

@@ -34,10 +34,11 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Face service unavailable. Try again shortly." }, { status: 503 });
   }
 
-  // Enrich baremetal's (person_id, score) with name + thumbnail from MySQL.
+  // Enrich baremetal's (person_id, score) with name, company + thumbnail from MySQL.
   const candidates: {
     person_id: number;
     name: string;
+    full_company_name: string | null;
     photo_url: string | null;
     score: number;
     confident: boolean;
@@ -48,6 +49,7 @@ export async function POST(request: Request) {
     candidates.push({
       person_id: c.person_id,
       name: person.name,
+      full_company_name: person.full_company_name,
       photo_url: person.photo_path ? `${BASE_PATH}/api/photos/${c.person_id}` : null,
       score: c.score,
       confident: c.confident,
