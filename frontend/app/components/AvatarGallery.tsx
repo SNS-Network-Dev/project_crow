@@ -7,9 +7,9 @@ import { BASE_PATH } from "@/lib/basePath";
 import { useAdminHome } from "./useAdminHome";
 
 // The pickup "live wall". Polls the gallery feed; shows every finished capture
-// newest-first. A guest finds their set, taps the pose(s) they want, and gets a
-// QR that opens the PUBLIC /d/<token> download page on their phone. Nothing is
-// generated here — this is purely selection + handoff.
+// newest-first grouped by session. A guest finds their photo, taps the top-right
+// checkmark to select it, and clicks the photo body to open a larger preview.
+// Selected photos become a QR that opens the PUBLIC /d/<token> download page.
 
 interface Poster {
   id: string;
@@ -25,13 +25,6 @@ interface GallerySet {
 }
 
 const POLL_MS = 3000;
-
-const VARIANT_LABEL: Record<string, string> = {
-  "arm-around": "Arm around",
-  "pose-follow": "Your pose",
-  group: "Group",
-  "group+kelvin": "+ Mr Kelvin",
-};
 
 // base64url of the joined ids — matches decodeSelection() on the server.
 function encodeSelection(ids: string[]): string {
@@ -50,17 +43,30 @@ function timeAgo(ms: number): string {
   return `${h} hr ago`;
 }
 
+function formatSessionTime(ms: number): string {
+  return new Date(ms).toLocaleString("en-US", {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
+}
+
 export default function AvatarGallery() {
   const [sets, setSets] = useState<GallerySet[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [qrUrl, setQrUrl] = useState<string | null>(null);
+  const [modalPoster, setModalPoster] = useState<Poster | null>(null);
   const homeHref = useAdminHome();
   const timer = useRef<number | null>(null);
 
   const poll = useCallback(async () => {
     try {
-      const res = await fetch(`${BASE_PATH}/api/avatar/gallery`, { cache: "no-store" });
+      const res = await fetch(`${BASE_PATH}/api/avatar/gallery`, {
+        cache: "no-store",
+      });
       if (!res.ok) return;
       const body = (await res.json()) as { sets: GallerySet[] };
       setSets(body.sets ?? []);
@@ -72,20 +78,24 @@ export default function AvatarGallery() {
   }, []);
 
   useEffect(() => {
-    poll();
+    const t1 = window.setTimeout(poll, 0);
     timer.current = window.setInterval(poll, POLL_MS);
     return () => {
+      window.clearTimeout(t1);
       if (timer.current) window.clearInterval(timer.current);
     };
   }, [poll]);
 
   // Drop selections whose poster has aged off the wall.
   useEffect(() => {
-    const live = new Set(sets.flatMap((s) => s.posters.map((p) => p.id)));
-    setSelected((prev) => {
-      const next = new Set([...prev].filter((id) => live.has(id)));
-      return next.size === prev.size ? prev : next;
-    });
+    const t = window.setTimeout(() => {
+      const live = new Set(sets.flatMap((s) => s.posters.map((p) => p.id)));
+      setSelected((prev) => {
+        const next = new Set([...prev].filter((id) => live.has(id)));
+        return next.size === prev.size ? prev : next;
+      });
+    }, 0);
+    return () => window.clearTimeout(t);
   }, [sets]);
 
   const toggle = useCallback((id: string) => {
@@ -113,11 +123,14 @@ export default function AvatarGallery() {
   }, [selected]);
 
   return (
-    <div className="gallery">
+    <div className="gallery gallery--with-sidebar">
       <header className="gallery-head">
         <div>
           <h1>Photo gallery</h1>
-          <p className="subtitle">Pick the photos you want, then scan the QR to save them.</p>
+          <p className="subtitle">
+            Tap a photo to view it larger. Use the top-right checkmark to select
+            photos for download.
+          </p>
         </div>
         <Link href={homeHref} className="gallery-home" aria-label="Home">
           <span className="kiosk-x" aria-hidden />
@@ -133,30 +146,50 @@ export default function AvatarGallery() {
       )}
 
       <div className="gallery-grid">
-        {sets.map((set) => (
+        {sets.map((set, setIndex) => (
           <section key={set.id} className="gset">
             <div className="gset-head">
-              <span className={`gbadge gbadge--${set.mode}`}>
-                {set.mode === "kelvin" ? "With Mr Kelvin" : "Group"}
+              <span className="gset-title">
+                Session {sets.length - setIndex}
               </span>
-              <span className="gset-time">{timeAgo(set.createdAt)}</span>
+              <span
+                className="gset-time"
+                title={formatSessionTime(set.createdAt)}
+              >
+                {timeAgo(set.createdAt)} · {set.posters.length} photo
+                {set.posters.length > 1 ? "s" : ""}
+              </span>
             </div>
             <div className="gset-thumbs">
               {set.posters.map((p) => {
                 const isSel = selected.has(p.id);
                 return (
-                  <button
+                  <div
                     key={p.id}
-                    type="button"
                     className={`gthumb ${isSel ? "gthumb--selected" : ""}`}
-                    onClick={() => toggle(p.id)}
-                    aria-pressed={isSel}
                   >
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={p.url} alt={p.variant ?? "poster"} loading="lazy" />
-                    {p.variant && <span className="gthumb-tag">{VARIANT_LABEL[p.variant] ?? p.variant}</span>}
-                    <span className="gthumb-check" aria-hidden />
-                  </button>
+                    <button
+                      type="button"
+                      className="gthumb-photo"
+                      onClick={() => setModalPoster(p)}
+                      aria-label="View photo"
+                    >
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={p.url} alt="Captured photo" loading="lazy" />
+                    </button>
+                    <button
+                      type="button"
+                      className="gthumb-check"
+                      aria-pressed={isSel}
+                      aria-label={isSel ? "Deselect photo" : "Select photo"}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        toggle(p.id);
+                      }}
+                    >
+                      <span className="gthumb-checkmark" aria-hidden />
+                    </button>
+                  </div>
                 );
               })}
             </div>
@@ -170,7 +203,10 @@ export default function AvatarGallery() {
             {selected.size} photo{selected.size > 1 ? "s" : ""} selected
           </span>
           <div className="row">
-            <button className="btn btn--ghost" onClick={() => setSelected(new Set())}>
+            <button
+              className="btn btn--ghost"
+              onClick={() => setSelected(new Set())}
+            >
               Clear
             </button>
             <button className="btn" onClick={makeQr}>
@@ -180,11 +216,43 @@ export default function AvatarGallery() {
         </div>
       )}
 
+      {/* Photo lightbox modal */}
+      {modalPoster && (
+        <div className="photo-backdrop" onClick={() => setModalPoster(null)}>
+          <button
+            type="button"
+            className="photo-modal-close"
+            aria-label="Close"
+            onClick={() => setModalPoster(null)}
+          >
+            <span className="kiosk-x" aria-hidden />
+          </button>
+          <div className="photo-modal" onClick={(e) => e.stopPropagation()}>
+            <button
+              type="button"
+              className={`photo-modal-select ${selected.has(modalPoster.id) ? "photo-modal-select--active" : ""}`}
+              aria-pressed={selected.has(modalPoster.id)}
+              aria-label={
+                selected.has(modalPoster.id) ? "Deselect photo" : "Select photo"
+              }
+              onClick={() => toggle(modalPoster.id)}
+            >
+              <span className="gthumb-checkmark" aria-hidden />
+            </button>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={modalPoster.url} alt="Captured photo" />
+          </div>
+        </div>
+      )}
+
+      {/* QR download modal */}
       {qrUrl && (
         <div className="qr-backdrop" onClick={() => setQrUrl(null)}>
           <div className="qr-modal" onClick={(e) => e.stopPropagation()}>
             <h2>Scan to save</h2>
-            <p className="subtitle">Point your phone camera at the code to open your photos.</p>
+            <p className="subtitle">
+              Point your phone camera at the code to open your photos.
+            </p>
             {qrDataUrl && (
               /* eslint-disable-next-line @next/next/no-img-element */
               <img className="qr-img" src={qrDataUrl} alt="Download QR code" />

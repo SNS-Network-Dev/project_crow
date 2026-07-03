@@ -1443,19 +1443,32 @@ th {
   cursor: pointer;
 }
 
+:root {
+  --sidebar-width: 16rem;
+  --sidebar-collapsed: 4rem;
+}
+
 /* ===== Avatar pickup gallery: live wall ===== */
 .gallery {
   min-height: 100vh;
   min-height: 100dvh;
-  padding: 24px clamp(16px, 4vw, 40px) 120px;
+  padding: 24px clamp(16px, 4vw, 40px) 140px;
   background: var(--bg);
+}
+.gallery--with-sidebar {
+  /* when the sidebar is present the page sits inside .appMain; keep the same
+     padding so the gallery still feels like a tool surface, just with nav. */
+  min-height: auto;
 }
 .gallery-head {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
   gap: 16px;
-  margin-bottom: 22px;
+  margin-bottom: 26px;
+}
+.gallery-head h1 {
+  margin-bottom: 4px;
 }
 .gallery-home {
   flex: 0 0 auto;
@@ -1476,109 +1489,123 @@ th {
   margin-top: 12px;
 }
 .gallery-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-  gap: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
 }
 .gset {
   background: var(--panel);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  padding: 14px;
+  padding: 18px;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.05);
 }
 .gset-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 12px;
+  gap: 12px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
 }
-.gbadge {
-  font-size: 12px;
+.gset-title {
+  font-size: 1.05rem;
   font-weight: 700;
-  padding: 4px 10px;
-  border-radius: 999px;
-  color: #fff;
-}
-.gbadge--kelvin {
-  background: var(--accent);
-}
-.gbadge--group {
-  background: #7c3aed;
 }
 .gset-time {
-  font-size: 12px;
+  font-size: 0.85rem;
   color: var(--muted);
 }
 .gset-thumbs {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 8px;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 14px;
+}
+@media (min-width: 1200px) {
+  .gset-thumbs {
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  }
 }
 .gthumb {
   position: relative;
-  padding: 0;
   border: 2px solid var(--border);
-  border-radius: 10px;
+  border-radius: 12px;
   overflow: hidden;
   background: var(--panel-2);
-  cursor: pointer;
-  transition: border-color 0.12s ease;
+  transition:
+    border-color 0.12s ease,
+    transform 0.12s ease;
 }
-.gthumb img {
+.gthumb:hover {
+  transform: translateY(-2px);
+}
+.gthumb--selected {
+  border-color: var(--accent);
+}
+.gthumb-photo {
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: none;
+  background: transparent;
+  cursor: zoom-in;
+}
+.gthumb-photo img {
   display: block;
   width: 100%;
   aspect-ratio: 1280 / 717;
   object-fit: cover;
 }
-.gthumb-tag {
-  position: absolute;
-  left: 6px;
-  bottom: 6px;
-  font-size: 11px;
-  font-weight: 600;
-  color: #fff;
-  background: rgba(0, 0, 0, 0.6);
-  padding: 2px 8px;
-  border-radius: 999px;
-}
 .gthumb-check {
   position: absolute;
-  top: 6px;
-  right: 6px;
-  width: 22px;
-  height: 22px;
+  top: 10px;
+  right: 10px;
+  width: 28px;
+  height: 28px;
   border-radius: 50%;
-  background: rgba(255, 255, 255, 0.85);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.92);
   border: 2px solid var(--border);
+  cursor: pointer;
+  transition:
+    opacity 0.12s ease,
+    background 0.12s ease,
+    border-color 0.12s ease;
+}
+.gthumb-check:hover {
+  background: #fff;
+}
+.gthumb .gthumb-check {
   opacity: 0;
-  transition: opacity 0.12s ease;
 }
-.gthumb--selected {
-  border-color: var(--accent);
-}
+.gthumb:hover .gthumb-check,
 .gthumb--selected .gthumb-check {
   opacity: 1;
+}
+.gthumb--selected .gthumb-check {
   background: var(--accent);
   border-color: #fff;
 }
-.gthumb--selected .gthumb-check::after {
-  content: "";
-  position: absolute;
-  left: 6px;
-  top: 3px;
-  width: 6px;
-  height: 10px;
+.gthumb-checkmark {
+  display: inline-block;
+  width: 7px;
+  height: 12px;
   border-right: 2px solid #fff;
   border-bottom: 2px solid #fff;
-  transform: rotate(45deg);
+  transform: rotate(45deg) translate(-1px, -1px);
+  opacity: 0;
+}
+.gthumb--selected .gthumb-checkmark {
+  opacity: 1;
 }
 .gallery-bar {
   position: fixed;
   left: 50%;
   bottom: calc(env(safe-area-inset-bottom) + 18px);
   transform: translateX(-50%);
-  z-index: 20;
+  z-index: 30;
   display: flex;
   align-items: center;
   gap: 18px;
@@ -1590,6 +1617,86 @@ th {
 }
 .gallery-bar-count {
   font-weight: 700;
+}
+
+/* Photo lightbox modal */
+.photo-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: rgba(0, 0, 0, 0.78);
+  backdrop-filter: blur(4px);
+}
+.photo-modal {
+  position: relative;
+  width: min(95vw, 1200px);
+  max-height: 92vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+.photo-modal img {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-height: 92vh;
+  object-fit: contain;
+  border-radius: var(--radius);
+}
+.photo-modal-close {
+  position: fixed;
+  top: 18px;
+  right: 18px;
+  width: 44px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.45);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: 50%;
+  color: #fff;
+  cursor: pointer;
+  z-index: 51;
+  transition: background 0.12s ease;
+}
+.photo-modal-close:hover {
+  background: rgba(0, 0, 0, 0.7);
+}
+.photo-modal-select {
+  position: fixed;
+  top: 18px;
+  right: 72px;
+  width: 44px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.92);
+  border: 2px solid var(--border);
+  border-radius: 50%;
+  cursor: pointer;
+  z-index: 51;
+  transition: background 0.12s ease;
+}
+.photo-modal-select:hover {
+  background: #fff;
+}
+.photo-modal-select--active {
+  background: var(--accent);
+  border-color: #fff;
+}
+.photo-modal-select .gthumb-checkmark {
+  opacity: 0;
+}
+.photo-modal-select--active .gthumb-checkmark {
+  opacity: 1;
 }
 
 /* QR modal */
