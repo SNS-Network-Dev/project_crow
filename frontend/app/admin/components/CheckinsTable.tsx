@@ -1,60 +1,234 @@
 "use client";
 
-import { useMemo } from "react";
-import type { Checkin } from "./useAdminData";
+import { useEffect, useMemo, useState } from "react";
+import type { Checkin, Person } from "./useAdminData";
 import styles from "./admin.module.css";
 
-interface Props {
-  checkins: Checkin[];
-  search: string;
+// The page index can land past the last page after filtering/page-size changes.
+// We derive a clamped page instead of resetting state inside an effect.
+
+const DASH = "—";
+
+function initials(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return "?";
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
 }
 
-export default function CheckinsTable({ checkins, search }: Props) {
+function formatDateTime(d: Date): string {
+  // 3/7/2026 11:06 AM
+  return d.toLocaleString("en-US", {
+    year: "numeric",
+    month: "numeric",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
+}
+
+interface Props {
+  people: Person[];
+  checkins: Checkin[];
+  search: string;
+  onDeleteCheckin: (id: number) => Promise<boolean>;
+}
+
+const PAGE_SIZE_OPTIONS = ["10", "20", "50", "100", "200", "all"];
+
+export default function CheckinsTable({
+  people,
+  checkins,
+  search,
+  onDeleteCheckin,
+}: Props) {
+  const [pageSize, setPageSize] = useState<string>("10");
+  const [page, setPage] = useState(1);
+  const [now, setNow] = useState<Date | null>(null);
+  const [deletingId, setDeletingId] = useState<number | null>(null);
+
+  // Hydrate the clock on mount (via setTimeout so setState runs in a callback),
+  // then tick every second.
+  useEffect(() => {
+    const t1 = window.setTimeout(() => setNow(new Date()), 0);
+    const id = window.setInterval(() => setNow(new Date()), 1000);
+    return () => {
+      window.clearTimeout(t1);
+      window.clearInterval(id);
+    };
+  }, []);
+
+  const peopleById = useMemo(() => {
+    const m = new Map<number, Person>();
+    for (const p of people) m.set(p.id, p);
+    return m;
+  }, [people]);
+
+  const rows = useMemo(() => {
+    return checkins.map((c) => ({
+      checkin: c,
+      person: peopleById.get(c.person_id),
+    }));
+  }, [checkins, peopleById]);
+
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
-    if (!q) return checkins;
-    return checkins.filter((c) => c.name.toLowerCase().includes(q));
-  }, [checkins, search]);
+    if (!q) return rows;
+    return rows.filter(({ checkin: c, person: p }) => {
+      const hay =
+        `${c.name} ${p?.full_company_name ?? ""} ${p?.designation ?? ""} ${
+          p?.remarks ?? ""
+        }`.toLowerCase();
+      return hay.includes(q);
+    });
+  }, [rows, search]);
+
+  const size = pageSize === "all" ? Infinity : Number(pageSize);
+  const totalPages =
+    size === Infinity ? 1 : Math.max(1, Math.ceil(filtered.length / size));
+  const safePage = Math.min(Math.max(1, page), totalPages);
+  const start = size === Infinity ? 0 : (safePage - 1) * size;
+  const paged =
+    size === Infinity ? filtered : filtered.slice(start, start + size);
+
+  const handleUndo = async (id: number) => {
+    setDeletingId(id);
+    await onDeleteCheckin(id);
+    setDeletingId(null);
+  };
 
   return (
     <div>
       <div className={styles.toolbar}>
         <span className={styles.liveDot} title="Auto-refreshes every 10s" />
         <span className={styles.liveLabel}>Live</span>
+        {now && <span className={styles.liveTime}>{formatDateTime(now)}</span>}
       </div>
 
-      <div className="panel" style={{ padding: 0, overflow: "hidden" }}>
-        {filtered.length === 0 ? (
-          <p className="muted" style={{ padding: 20 }}>
-            No check-ins yet.
-          </p>
-        ) : (
-          <div className="admin-table-wrapper">
-            <table className={`admin-table ${styles.adminTable}`}>
-              <thead>
-                <tr>
-                  <th>When</th>
-                  <th>Name</th>
-                  <th>Match</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filtered.map((c) => (
-                  <tr key={c.id}>
-                    <td className="td-time">{new Date(c.checked_in_at).toLocaleString()}</td>
-                    <td className="td-name">{c.name}</td>
-                    <td>{c.score > 0 ? `${(c.score * 100).toFixed(0)}%` : "manual"}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+      <div className="admin-table-wrapper">
+        <table className={`admin-table ${styles.adminTable}`}>
+          <thead>
+            <tr>
+              <th className="td-no">No</th>
+              <th className="td-photo">Photo</th>
+              <th className={styles.colDesignation}>Designation</th>
+              <th>Full Name</th>
+              <th className={styles.colCompany}>Company</th>
+              <th className={styles.colRemarks}>Remarks</th>
+              <th className={styles.colTime}>Checked in time</th>
+              <th className={styles.colUndo}>Undo</th>
+            </tr>
+          </thead>
+          <tbody>
+            {filtered.length === 0 && (
+              <tr>
+                <td colSpan={8} className={styles.emptyRow}>
+                  No check-ins yet.
+                </td>
+              </tr>
+            )}
+            {paged.map(({ checkin: c, person: p }, i) => (
+              <tr key={c.id}>
+                <td className="td-no">{start + i + 1}</td>
+                <td className="td-photo">
+                  {p?.photo_url ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={p.photo_url} alt={p.name} />
+                  ) : (
+                    <span className="avatar-placeholder">
+                      {initials(c.name)}
+                    </span>
+                  )}
+                </td>
+                <td className={styles.colDesignation}>
+                  {p?.designation ?? DASH}
+                </td>
+                <td className="td-name">{c.name}</td>
+                <td className={styles.colCompany}>
+                  {p?.full_company_name ?? DASH}
+                </td>
+                <td
+                  className={styles.colRemarks}
+                  title={p?.remarks ?? undefined}
+                >
+                  {p?.remarks ?? DASH}
+                </td>
+                <td className={styles.colTime}>
+                  {new Date(c.checked_in_at).toLocaleString("en-US", {
+                    year: "numeric",
+                    month: "numeric",
+                    day: "numeric",
+                    hour: "numeric",
+                    minute: "2-digit",
+                  })}
+                </td>
+                <td className={styles.colUndo}>
+                  <button
+                    type="button"
+                    className="btn btn--danger btn--sm"
+                    disabled={deletingId === c.id}
+                    onClick={() => handleUndo(c.id)}
+                  >
+                    {deletingId === c.id ? "Undoing…" : "Undo"}
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      <div className={styles.tableFooter}>
+        <div className={styles.pageSizeWrap}>
+          <label
+            htmlFor="crow-checkin-page-size"
+            className={styles.pageSizeLabel}
+          >
+            Show
+          </label>
+          <select
+            id="crow-checkin-page-size"
+            className={styles.select}
+            value={pageSize}
+            onChange={(e) => setPageSize(e.target.value)}
+          >
+            {PAGE_SIZE_OPTIONS.map((opt) => (
+              <option key={opt} value={opt}>
+                {opt === "all" ? "ALL" : opt}
+              </option>
+            ))}
+          </select>
+          <span>per page</span>
+        </div>
+
+        <div className={styles.resultCount}>
+          {filtered.length} of {checkins.length} checked in
+        </div>
+
+        {totalPages > 1 && (
+          <div className={styles.pager}>
+            <button
+              type="button"
+              className="btn btn--ghost btn--sm"
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+              disabled={safePage <= 1}
+            >
+              Prev
+            </button>
+            <span className={styles.pagerInfo}>
+              Page {safePage} of {totalPages}
+            </span>
+            <button
+              type="button"
+              className="btn btn--ghost btn--sm"
+              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+              disabled={safePage >= totalPages}
+            >
+              Next
+            </button>
           </div>
         )}
       </div>
-
-      <p className={styles.resultCount} style={{ marginTop: 12 }}>
-        {filtered.length} of {checkins.length} recent check-ins
-      </p>
     </div>
   );
 }

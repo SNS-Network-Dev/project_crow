@@ -57,9 +57,21 @@ export interface CheckinRow extends RowDataPacket {
 }
 
 const PERSON_COLS = [
-  "id", "name", "email", "contact_number", "company_email", "full_company_name",
-  "designation", "invited_by", "details", "remarks", "photo_path", "qr_code_path",
-  "consent_at", "created_at", "updated_at",
+  "id",
+  "name",
+  "email",
+  "contact_number",
+  "company_email",
+  "full_company_name",
+  "designation",
+  "invited_by",
+  "details",
+  "remarks",
+  "photo_path",
+  "qr_code_path",
+  "consent_at",
+  "created_at",
+  "updated_at",
 ].join(", ");
 
 // ---------- people ----------
@@ -94,26 +106,32 @@ export async function createPerson(p: {
       p.remarks ?? null,
       p.embedding,
       p.consent ? new Date() : null,
-    ]
+    ],
   );
   return res.insertId;
 }
 
-export async function setPhotoPath(id: number, photoPath: string): Promise<void> {
-  await pool.execute(`UPDATE project_crow_people SET photo_path = ? WHERE id = ?`, [photoPath, id]);
+export async function setPhotoPath(
+  id: number,
+  photoPath: string,
+): Promise<void> {
+  await pool.execute(
+    `UPDATE project_crow_people SET photo_path = ? WHERE id = ?`,
+    [photoPath, id],
+  );
 }
 
 export async function getPerson(id: number): Promise<PersonRow | null> {
   const [rows] = await pool.query<PersonRow[]>(
     `SELECT ${PERSON_COLS} FROM project_crow_people WHERE id = ?`,
-    [id]
+    [id],
   );
   return rows[0] ?? null;
 }
 
 export async function listPeople(): Promise<PersonRow[]> {
   const [rows] = await pool.query<PersonRow[]>(
-    `SELECT ${PERSON_COLS} FROM project_crow_people ORDER BY name ASC`
+    `SELECT ${PERSON_COLS} FROM project_crow_people ORDER BY name ASC`,
   );
   return rows;
 }
@@ -127,7 +145,7 @@ export async function deletePerson(id: number): Promise<PersonRow | null> {
 
 export async function countPeople(): Promise<number> {
   const [rows] = await pool.query<RowDataPacket[]>(
-    `SELECT COUNT(*) AS c FROM project_crow_people`
+    `SELECT COUNT(*) AS c FROM project_crow_people`,
   );
   return Number(rows[0].c);
 }
@@ -135,49 +153,79 @@ export async function countPeople(): Promise<number> {
 /** All (id, embedding) rows — used to (re)hydrate the baremetal matrix. */
 export async function allEmbeddings(): Promise<EmbeddingRow[]> {
   const [rows] = await pool.query<EmbeddingRow[]>(
-    `SELECT id, embedding FROM project_crow_people ORDER BY id ASC`
+    `SELECT id, embedding FROM project_crow_people ORDER BY id ASC`,
   );
   return rows;
 }
 
-export async function updatePerson(id: number, p: {
-  name?: string;
-  email?: string | null;
-  contactNumber?: string | null;
-  companyEmail?: string | null;
-  fullCompanyName?: string | null;
-  designation?: string | null;
-  invitedBy?: string | null;
-  remarks?: string | null;
-}): Promise<boolean> {
+export async function updatePerson(
+  id: number,
+  p: {
+    name?: string;
+    email?: string | null;
+    contactNumber?: string | null;
+    companyEmail?: string | null;
+    fullCompanyName?: string | null;
+    designation?: string | null;
+    invitedBy?: string | null;
+    remarks?: string | null;
+  },
+): Promise<boolean> {
   const sets: string[] = [];
   const vals: (string | number | null)[] = [];
 
-  if (p.name !== undefined)          { sets.push("name = ?");            vals.push(p.name); }
-  if (p.email !== undefined)         { sets.push("email = ?");           vals.push(p.email); }
-  if (p.contactNumber !== undefined) { sets.push("contact_number = ?");  vals.push(p.contactNumber); }
-  if (p.companyEmail !== undefined)  { sets.push("company_email = ?");   vals.push(p.companyEmail); }
-  if (p.fullCompanyName !== undefined){ sets.push("full_company_name = ?"); vals.push(p.fullCompanyName); }
-  if (p.designation !== undefined)   { sets.push("designation = ?");     vals.push(p.designation); }
-  if (p.invitedBy !== undefined)     { sets.push("invited_by = ?");      vals.push(p.invitedBy); }
-  if (p.remarks !== undefined)       { sets.push("remarks = ?");         vals.push(p.remarks); }
+  if (p.name !== undefined) {
+    sets.push("name = ?");
+    vals.push(p.name);
+  }
+  if (p.email !== undefined) {
+    sets.push("email = ?");
+    vals.push(p.email);
+  }
+  if (p.contactNumber !== undefined) {
+    sets.push("contact_number = ?");
+    vals.push(p.contactNumber);
+  }
+  if (p.companyEmail !== undefined) {
+    sets.push("company_email = ?");
+    vals.push(p.companyEmail);
+  }
+  if (p.fullCompanyName !== undefined) {
+    sets.push("full_company_name = ?");
+    vals.push(p.fullCompanyName);
+  }
+  if (p.designation !== undefined) {
+    sets.push("designation = ?");
+    vals.push(p.designation);
+  }
+  if (p.invitedBy !== undefined) {
+    sets.push("invited_by = ?");
+    vals.push(p.invitedBy);
+  }
+  if (p.remarks !== undefined) {
+    sets.push("remarks = ?");
+    vals.push(p.remarks);
+  }
 
   if (sets.length === 0) return false;
   vals.push(id);
 
   const [res] = await pool.execute<ResultSetHeader>(
     `UPDATE project_crow_people SET ${sets.join(", ")} WHERE id = ?`,
-    vals
+    vals,
   );
   return res.affectedRows > 0;
 }
 
 // ---------- checkins ----------
 
-export async function logCheckin(personId: number, score: number): Promise<number> {
+export async function logCheckin(
+  personId: number,
+  score: number,
+): Promise<number> {
   const [res] = await pool.execute<ResultSetHeader>(
     `INSERT INTO project_crow_checkins (person_id, score) VALUES (?, ?)`,
-    [personId, score]
+    [personId, score],
   );
   return res.insertId;
 }
@@ -185,7 +233,9 @@ export async function logCheckin(personId: number, score: number): Promise<numbe
 // Most recent check-in for one person, or null if they've never checked in.
 // Used by /api/confirm to enforce one check-in per person — a second attempt
 // is reported back to the kiosk as "already checked in" instead of inserting.
-export async function latestCheckinForPerson(personId: number): Promise<CheckinRow | null> {
+export async function latestCheckinForPerson(
+  personId: number,
+): Promise<CheckinRow | null> {
   const [rows] = await pool.query<CheckinRow[]>(
     `SELECT c.id, c.person_id, p.name, c.score, c.checked_in_at
        FROM project_crow_checkins c
@@ -193,7 +243,7 @@ export async function latestCheckinForPerson(personId: number): Promise<CheckinR
       WHERE c.person_id = ?
       ORDER BY c.checked_in_at DESC
       LIMIT 1`,
-    [personId]
+    [personId],
   );
   return rows[0] ?? null;
 }
@@ -205,7 +255,7 @@ export async function recentCheckins(limit = 50): Promise<CheckinRow[]> {
        FROM project_crow_checkins c
        JOIN project_crow_people p ON p.id = c.person_id
       ORDER BY c.checked_in_at DESC
-      LIMIT ${safeLimit}`
+      LIMIT ${safeLimit}`,
   );
   return rows;
 }
@@ -214,7 +264,7 @@ export async function recentCheckins(limit = 50): Promise<CheckinRow[]> {
 
 export async function countCheckins(): Promise<number> {
   const [rows] = await pool.query<RowDataPacket[]>(
-    `SELECT COUNT(*) AS c FROM project_crow_checkins`
+    `SELECT COUNT(*) AS c FROM project_crow_checkins`,
   );
   return Number(rows[0].c);
 }
@@ -222,7 +272,7 @@ export async function countCheckins(): Promise<number> {
 export async function countCheckinsSince(date: Date): Promise<number> {
   const [rows] = await pool.query<RowDataPacket[]>(
     `SELECT COUNT(*) AS c FROM project_crow_checkins WHERE checked_in_at >= ?`,
-    [date]
+    [date],
   );
   return Number(rows[0].c);
 }
@@ -237,13 +287,16 @@ export async function countCheckinsToday(): Promise<number> {
 // Distinct people who have ever checked in — the denominator for no-show.
 export async function distinctCheckedInPersonCount(): Promise<number> {
   const [rows] = await pool.query<RowDataPacket[]>(
-    `SELECT COUNT(DISTINCT person_id) AS c FROM project_crow_checkins`
+    `SELECT COUNT(DISTINCT person_id) AS c FROM project_crow_checkins`,
   );
   return Number(rows[0].c);
 }
 
 // Full check-in history for one person (admin drawer). Same shape as recentCheckins.
-export async function checkinsForPerson(personId: number, limit = 100): Promise<CheckinRow[]> {
+export async function checkinsForPerson(
+  personId: number,
+  limit = 100,
+): Promise<CheckinRow[]> {
   const safeLimit = Math.min(Math.max(Math.trunc(limit) || 0, 1), 500);
   const [rows] = await pool.query<CheckinRow[]>(
     `SELECT c.id, c.person_id, p.name, c.score, c.checked_in_at
@@ -252,7 +305,15 @@ export async function checkinsForPerson(personId: number, limit = 100): Promise<
       WHERE c.person_id = ?
       ORDER BY c.checked_in_at DESC
       LIMIT ${safeLimit}`,
-    [personId]
+    [personId],
   );
   return rows;
+}
+
+export async function deleteCheckin(id: number): Promise<boolean> {
+  const [res] = await pool.execute<ResultSetHeader>(
+    `DELETE FROM project_crow_checkins WHERE id = ?`,
+    [id],
+  );
+  return res.affectedRows > 0;
 }

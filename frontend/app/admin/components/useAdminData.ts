@@ -60,6 +60,7 @@ interface AdminData {
   refreshStats: () => Promise<void>;
   patchPerson: (id: number, patch: PersonPatch) => Promise<boolean>;
   deletePersonById: (id: number) => Promise<boolean>;
+  deleteCheckinById: (id: number) => Promise<boolean>;
 }
 
 const POLL_MS = 10_000;
@@ -103,7 +104,9 @@ export function useAdminData(): AdminData {
     if (inFlight.current.has("checkins")) return;
     inFlight.current.add("checkins");
     try {
-      const c = await getJson<{ checkins: Checkin[] }>("/api/checkins?limit=50");
+      const c = await getJson<{ checkins: Checkin[] }>(
+        "/api/checkins?limit=50",
+      );
       setCheckins(c.checkins ?? []);
     } catch {
       /* keep last */
@@ -198,7 +201,25 @@ export function useAdminData(): AdminData {
   const deletePersonById = useCallback(
     async (id: number): Promise<boolean> => {
       try {
-        const res = await fetch(`${BASE_PATH}/api/people/${id}`, { method: "DELETE" });
+        const res = await fetch(`${BASE_PATH}/api/people/${id}`, {
+          method: "DELETE",
+        });
+        if (!res.ok) return false;
+        await refreshAll();
+        return true;
+      } catch {
+        return false;
+      }
+    },
+    [refreshAll],
+  );
+
+  const deleteCheckinById = useCallback(
+    async (id: number): Promise<boolean> => {
+      try {
+        const res = await fetch(`${BASE_PATH}/api/checkins/${id}`, {
+          method: "DELETE",
+        });
         if (!res.ok) return false;
         await refreshAll();
         return true;
@@ -220,5 +241,6 @@ export function useAdminData(): AdminData {
     refreshStats,
     patchPerson,
     deletePersonById,
+    deleteCheckinById,
   };
 }

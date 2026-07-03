@@ -6,7 +6,7 @@ import PeopleTable from "./components/PeopleTable";
 import PersonDrawer from "./components/PersonDrawer";
 import CheckinsTable from "./components/CheckinsTable";
 
-type Tab = "people" | "checkins";
+type Tab = "people" | "checkins" | "notCheckedIn";
 
 export default function AdminPage() {
   const data = useAdminData();
@@ -14,7 +14,10 @@ export default function AdminPage() {
   const [search, setSearch] = useState("");
   const [selectedId, setSelectedId] = useState<number | null>(null);
 
-  const selectedPerson = selectedId != null ? data.people.find((p) => p.id === selectedId) ?? null : null;
+  const selectedPerson =
+    selectedId != null
+      ? (data.people.find((p) => p.id === selectedId) ?? null)
+      : null;
 
   const openDrawer = useCallback((id: number) => setSelectedId(id), []);
   const closeDrawer = useCallback(() => setSelectedId(null), []);
@@ -28,6 +31,11 @@ export default function AdminPage() {
     [data, closeDrawer],
   );
 
+  const notCheckedInCount =
+    data.stats?.notCheckedIn ??
+    data.people.filter((p) => !data.checkins.some((c) => c.person_id === p.id))
+      .length;
+
   return (
     <main className="wrap wrap--wide">
       <h1>Admin</h1>
@@ -36,16 +44,32 @@ export default function AdminPage() {
       {data.error && <div className="notice notice--error">{data.error}</div>}
 
       <div className="tab-bar">
-        <button className={tab === "people" ? "tab tab--active" : "tab"} onClick={() => setTab("people")}>
+        <button
+          className={tab === "people" ? "tab tab--active" : "tab"}
+          onClick={() => setTab("people")}
+        >
           Registered ({data.people.length})
         </button>
-        <button className={tab === "checkins" ? "tab tab--active" : "tab"} onClick={() => setTab("checkins")}>
+        <button
+          className={tab === "checkins" ? "tab tab--active" : "tab"}
+          onClick={() => setTab("checkins")}
+        >
           Checked in ({data.checkins.length})
+        </button>
+        <button
+          className={tab === "notCheckedIn" ? "tab tab--active" : "tab"}
+          onClick={() => setTab("notCheckedIn")}
+        >
+          Not checked in ({notCheckedInCount})
         </button>
         <input
           className="tabSearch"
           type="text"
-          placeholder={tab === "people" ? "Search name, email, company…" : "Search by name…"}
+          placeholder={
+            tab === "checkins"
+              ? "Search by name, company, designation…"
+              : "Search name, email, company…"
+          }
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           aria-label="Search"
@@ -58,10 +82,28 @@ export default function AdminPage() {
           checkins={data.checkins}
           search={search}
           onSelect={openDrawer}
+          checkedInFilter="all"
         />
       )}
 
-      {tab === "checkins" && <CheckinsTable checkins={data.checkins} search={search} />}
+      {tab === "checkins" && (
+        <CheckinsTable
+          people={data.people}
+          checkins={data.checkins}
+          search={search}
+          onDeleteCheckin={data.deleteCheckinById}
+        />
+      )}
+
+      {tab === "notCheckedIn" && (
+        <PeopleTable
+          people={data.people}
+          checkins={data.checkins}
+          search={search}
+          onSelect={openDrawer}
+          checkedInFilter="notCheckedIn"
+        />
+      )}
 
       <PersonDrawer
         person={selectedPerson}

@@ -242,6 +242,21 @@
   color: var(--text);
 }
 
+.colTime {
+  white-space: nowrap;
+}
+
+.colUndo {
+  width: 80px;
+  text-align: center;
+}
+
+.liveTime {
+  margin-left: 8px;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
 @media (max-width: 980px) {
   .colCompany,
   .colDesignation,
