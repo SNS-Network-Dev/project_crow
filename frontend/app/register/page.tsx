@@ -18,6 +18,7 @@ export default function RegisterPage() {
   const [photo, setPhoto] = useState<Blob | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
   const [cameraError, setCameraError] = useState<string | null>(null);
+  const [cameraOpen, setCameraOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [okMsg, setOkMsg] = useState<string | null>(null);
@@ -45,6 +46,7 @@ export default function RegisterPage() {
     setConsent(false);
     setPhotoBlob(null);
     setCameraError(null);
+    setCameraOpen(false);
   }, [setPhotoBlob]);
 
   const submit = useCallback(async () => {
@@ -202,58 +204,51 @@ export default function RegisterPage() {
         {/* ---- Photo ---- */}
         <fieldset className="form-section register-photo-section">
           <legend>Photo *</legend>
-          {preview ? (
+          {cameraError && (
+            <div className="notice notice--error">{cameraError}</div>
+          )}
+          {preview && (
             <div className="register-preview-wrap">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={preview} alt="Preview" className="register-preview" />
-              <div className="row">
-                <button
-                  type="button"
-                  className="btn btn--ghost"
-                  onClick={() => setPhotoBlob(null)}
-                >
-                  Retake / remove
-                </button>
-                <label
-                  className="btn btn--ghost"
-                  style={{ margin: 0, display: "inline-flex" }}
-                >
-                  Upload file
-                  <input
-                    type="file"
-                    accept="image/*"
-                    hidden
-                    onChange={(e) => setPhotoBlob(e.target.files?.[0] ?? null)}
-                  />
-                </label>
-              </div>
             </div>
-          ) : (
-            <>
-              {cameraError && (
-                <div className="notice notice--error">{cameraError}</div>
-              )}
-              <FaceCapture
-                onCapture={setPhotoBlob}
-                onError={setCameraError}
-                className="register-face-capture"
-              />
-              <div className="register-upload-fallback">
-                <label
-                  className="btn btn--ghost"
-                  style={{ margin: 0, display: "inline-flex" }}
-                >
-                  Upload file
-                  <input
-                    type="file"
-                    accept="image/*"
-                    hidden
-                    onChange={(e) => setPhotoBlob(e.target.files?.[0] ?? null)}
-                  />
-                </label>
-              </div>
-            </>
           )}
+          <div className="row">
+            <button
+              type="button"
+              className="btn"
+              onClick={() => setCameraOpen(true)}
+            >
+              Take photo
+            </button>
+            <label
+              className="btn btn--ghost"
+              style={{ margin: 0, display: "inline-flex" }}
+            >
+              Upload file
+              <input
+                type="file"
+                accept="image/*"
+                hidden
+                onChange={(e) => setPhotoBlob(e.target.files?.[0] ?? null)}
+              />
+            </label>
+            {preview && (
+              <button
+                type="button"
+                className="btn btn--ghost"
+                onClick={() => setPhotoBlob(null)}
+              >
+                Remove
+              </button>
+            )}
+          </div>
+          <FaceCapture
+            open={cameraOpen}
+            onClose={() => setCameraOpen(false)}
+            onCapture={setPhotoBlob}
+            onError={setCameraError}
+          />
         </fieldset>
 
         {/* ---- Consent ---- */}
