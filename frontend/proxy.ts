@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
+import { getSessionSecret, verifyAdminToken } from "./lib/session";
 
 // Next 16 renamed `middleware.ts` -> `proxy.ts` (Node runtime; the function is
 // `proxy`, not `middleware`). See node_modules/next/dist/docs/.../proxy.md.
@@ -8,18 +9,15 @@ import type { NextRequest } from "next/server";
 //   /register and /                -> public (guests use these)
 //   /admin/* and /kiosk              -> operator-only (and their /api/* routes)
 //
-// Auth model: database-backed admins with a secure fallback to the
-// ADMIN_PASSWORD env var when no DB admins exist. /api/login verifies the
-// credentials and sets an httpOnly `crow_admin` cookie whose value IS the
-// env password when one is configured (compared here). A second client-readable
-// `crow_admin_status=1` cookie lets the Sidebar show/hide admin links without
-// exposing the secret.
-//
-// When ADMIN_PASSWORD is unset and there are no DB admins, admin stays open
-// (localhost dev convenience) and we stamp `crow_admin_status=1` so the Sidebar
-// still reveals the admin links.
+// Auth model: admin credentials live in the database (project_crow_admins).
+// /api/login verifies email/password and sets a signed httpOnly JWT cookie.
+// The signature key is SESSION_SECRET in frontend/.env.local — it is NOT an
+// admin password, just a random signing secret needed because middleware
+// cannot query MySQL. A second client-readable `crow_admin_status=1` cookie
+// lets the Sidebar show/hide admin links without exposing the token.
 
 const ADMIN_COOKIE = "crow_admin";
+const STATUS_COOKIE = "crow_admin_status";
 
 function isProtectedPage(pathname: string): boolean {
   return (
@@ -60,34 +58,41 @@ function isProtectedApi(request: NextRequest): boolean {
   );
 }
 
+function isAuthed(request: NextRequest): boolean {
+  try {
+    const secret = getSessionSecret();
+    const token = request.cookies.get(ADMIN_COOKIE)?.value;
+    return verifyAdminToken(token, secret) !== null;
+  } catch {
+    return false;
+  }
+}
+
 export function proxy(request: NextRequest) {
-  const pw = process.env.ADMIN_PASSWORD;
   const pathname = request.nextUrl.pathname;
 
-  // No passphrase configured -> admin stays open (dev). Still set the status
-  // cookie so the Sidebar shows the admin nav without a login.
-  if (!pw) {
+  // Keep the client-readable status cookie fresh whenever an admin page is hit.
+  // If the admin cookie is present but we can't verify it, clear both so the
+  // client knows to re-authenticate.
+  const protectedPage = isProtectedPage(pathname);
+  const protectedApi = isProtectedApi(request);
+
+  if (!protectedPage && !protectedApi) {
+    return NextResponse.next();
+  }
+
+  const authed = isAuthed(request);
+
+  if (authed) {
     const res = NextResponse.next();
-    if (request.cookies.get("crow_admin_status")?.value !== "1") {
-      res.cookies.set("crow_admin_status", "1", {
+    if (request.cookies.get(STATUS_COOKIE)?.value !== "1") {
+      res.cookies.set(STATUS_COOKIE, "1", {
         httpOnly: false,
         sameSite: "lax",
         path: "/",
       });
     }
     return res;
-  }
-
-  const protectedPage = isProtectedPage(pathname);
-  const protectedApi = isProtectedApi(request);
-  if (!protectedPage && !protectedApi) {
-    return NextResponse.next();
-  }
-
-  // Authed? Compare the httpOnly token to the configured passphrase.
-  const token = request.cookies.get(ADMIN_COOKIE)?.value;
-  if (token && token === pw) {
-    return NextResponse.next();
   }
 
   // Blocked. APIs get a 401 JSON; pages redirect to /login with a `next` param
@@ -99,7 +104,10 @@ export function proxy(request: NextRequest) {
   const basePath = request.nextUrl.basePath;
   const loginUrl = new URL(`${basePath}/login`, request.url);
   loginUrl.searchParams.set("next", pathname + request.nextUrl.search);
-  return NextResponse.redirect(loginUrl);
+  const res = NextResponse.redirect(loginUrl);
+  res.cookies.delete(ADMIN_COOKIE);
+  res.cookies.delete(STATUS_COOKIE);
+  return res;
 }
 
 export const config = {

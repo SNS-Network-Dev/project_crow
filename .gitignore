@@ -19,3 +19,4 @@ claude/
 dev.log
 
 
+frontend/.env.local

@@ -1,80 +1,67 @@
 import { NextResponse } from "next/server";
-import { countAdmins, findAdminByEmail, verifyPassword } from "@/lib/db";
+import {
+  countAdmins,
+  createAdmin,
+  findAdminByEmail,
+  verifyPassword,
+} from "@/lib/db";
+import { adminCookies } from "@/lib/session";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const ADMIN_COOKIE = "crow_admin";
-const MAX_AGE = 60 * 60 * 24 * 7; // 7 days
+const DEFAULT_BOOTSTRAP_EMAIL = "admin@projectcrow.com";
+const DEFAULT_BOOTSTRAP_PASSWORD = "123";
 
 export async function POST(request: Request) {
   const body = (await request.json().catch(() => null)) as
     | { email?: unknown; password?: unknown }
     | null;
-  const email =
+  let email =
     typeof body?.email === "string" ? body.email.trim().toLowerCase() : "";
   const password = typeof body?.password === "string" ? body.password : "";
 
-  let dbAuthenticated = false;
-
-  // Prefer database admins. If at least one admin exists, enforce DB auth.
   try {
-    const adminCount = await countAdmins();
-    if (adminCount > 0) {
-      if (!email) {
-        return NextResponse.json(
-          { error: "Email and password are required." },
-          { status: 400 },
-        );
-      }
-      const admin = await findAdminByEmail(email);
-      if (!admin || !verifyPassword(password, admin.password_hash)) {
-        return NextResponse.json(
-          { error: "Wrong email or password." },
-          { status: 401 },
-        );
-      }
-      dbAuthenticated = true;
+    let adminCount = await countAdmins();
+
+    // First-boot bootstrap: create a default admin so the user can log in.
+    // This only happens while the admins table is empty.
+    if (adminCount === 0) {
+      await createAdmin({
+        email: DEFAULT_BOOTSTRAP_EMAIL,
+        password: DEFAULT_BOOTSTRAP_PASSWORD,
+      });
+      adminCount = 1;
     }
-  } catch {
+
+    if (!email) {
+      return NextResponse.json(
+        { error: "Email and password are required." },
+        { status: 400 },
+      );
+    }
+
+    const admin = await findAdminByEmail(email);
+    if (!admin || !verifyPassword(password, admin.password_hash)) {
+      return NextResponse.json(
+        { error: "Wrong email or password." },
+        { status: 401 },
+      );
+    }
+
+    const cookies = adminCookies(admin.email);
+    const res = NextResponse.json({ ok: true });
+    res.cookies.set(cookies.token);
+    res.cookies.set(cookies.status);
+    return res;
+  } catch (e) {
+    const message = e instanceof Error ? e.message : "";
+    if (message.includes("SESSION_SECRET")) {
+      return NextResponse.json({ error: message }, { status: 500 });
+    }
     return NextResponse.json(
-      { error: "Could not verify credentials. Try again." },
+      { error: "Could not sign in. Try again." },
       { status: 503 },
     );
   }
-
-  // Fallback to env ADMIN_PASSWORD when no DB admins exist (dev / bootstrap).
-  const envPw = process.env.ADMIN_PASSWORD;
-  if (!dbAuthenticated) {
-    if (!envPw) {
-      return NextResponse.json(
-        { error: "No admin password is configured. Admin is open — just visit /admin." },
-        { status: 503 },
-      );
-    }
-    if (password !== envPw) {
-      return NextResponse.json({ error: "Wrong password." }, { status: 401 });
-    }
-  }
-
-  const token = dbAuthenticated
-    ? `${ADMIN_COOKIE}:db:${email}:${new Date().toISOString()}`
-    : (envPw ?? "");
-
-  const res = NextResponse.json({ ok: true });
-  // httpOnly token the proxy checks. For DB auth we still need a stable secret
-  // comparable in proxy.ts, so we keep envPw as the cookie value when present.
-  res.cookies.set(ADMIN_COOKIE, envPw ?? token, {
-    httpOnly: true,
-    sameSite: "lax",
-    path: "/",
-    maxAge: MAX_AGE,
-  });
-  res.cookies.set("crow_admin_status", "1", {
-    httpOnly: false,
-    sameSite: "lax",
-    path: "/",
-    maxAge: MAX_AGE,
-  });
-  return res;
 }

@@ -17,6 +17,11 @@ export default function AdminUsersPanel() {
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
 
+  // change-password state
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [changePassword, setChangePassword] = useState("");
+  const [changeBusy, setChangeBusy] = useState(false);
+
   const load = useCallback(async () => {
     try {
       const res = await fetch(`${BASE_PATH}/api/admins`, { cache: "no-store" });
@@ -33,6 +38,11 @@ export default function AdminUsersPanel() {
     load();
   }, [load]);
 
+  const showMessage = useCallback((text: string, isError = false) => {
+    setMessage(text);
+    window.setTimeout(() => setMessage(null), isError ? 5000 : 3000);
+  }, []);
+
   const create = useCallback(async () => {
     if (busy) return;
     setBusy(true);
@@ -45,20 +55,19 @@ export default function AdminUsersPanel() {
       });
       const body = await res.json().catch(() => ({}));
       if (!res.ok) {
-        setMessage(body.error ?? "Could not create admin.");
+        showMessage(body.error ?? "Could not create admin.", true);
       } else {
         setEmail("");
         setPassword("");
-        setMessage("Admin created.");
+        showMessage("Admin created.");
         await load();
       }
     } catch {
-      setMessage("Network error.");
+      showMessage("Network error.", true);
     } finally {
       setBusy(false);
-      window.setTimeout(() => setMessage(null), 3000);
     }
-  }, [busy, email, password, load]);
+  }, [busy, email, password, load, showMessage]);
 
   const remove = useCallback(
     async (id: number) => {
@@ -68,15 +77,56 @@ export default function AdminUsersPanel() {
           method: "DELETE",
         });
         if (!res.ok) throw new Error();
-        setMessage("Admin deleted.");
+        showMessage("Admin deleted.");
         await load();
       } catch {
-        setMessage("Could not delete admin.");
-      } finally {
-        window.setTimeout(() => setMessage(null), 3000);
+        showMessage("Could not delete admin.", true);
       }
     },
-    [load],
+    [load, showMessage],
+  );
+
+  const startChange = useCallback((id: number) => {
+    setEditingId(id);
+    setChangePassword("");
+    setMessage(null);
+  }, []);
+
+  const cancelChange = useCallback(() => {
+    setEditingId(null);
+    setChangePassword("");
+  }, []);
+
+  const savePassword = useCallback(
+    async (id: number) => {
+      if (changeBusy) return;
+      if (changePassword.length < 6) {
+        showMessage("Password must be at least 6 characters.", true);
+        return;
+      }
+      setChangeBusy(true);
+      try {
+        const res = await fetch(`${BASE_PATH}/api/admins/${id}/password`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ password: changePassword }),
+        });
+        const body = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          showMessage(body.error ?? "Could not update password.", true);
+        } else {
+          showMessage("Password updated.");
+          setEditingId(null);
+          setChangePassword("");
+          await load();
+        }
+      } catch {
+        showMessage("Network error.", true);
+      } finally {
+        setChangeBusy(false);
+      }
+    },
+    [changeBusy, changePassword, load, showMessage],
   );
 
   if (loading) return <p className="subtitle">Loading admins…</p>;
@@ -85,7 +135,8 @@ export default function AdminUsersPanel() {
     message &&
     (message.includes("error") ||
       message.includes("Could not") ||
-      message.includes("failed"));
+      message.includes("failed") ||
+      message.includes("must be"));
 
   return (
     <div className="panel" style={{ maxWidth: 560, marginTop: 20 }}>
@@ -126,15 +177,64 @@ export default function AdminUsersPanel() {
           {admins.map((a) => (
             <li key={a.id} className="admin-user-row">
               <span>{a.email}</span>
-              <button
-                className="btn btn--sm btn--danger"
-                onClick={() => remove(a.id)}
-              >
-                Delete
-              </button>
+              <div className="admin-user-actions">
+                <button
+                  className="btn btn--sm btn--ghost"
+                  onClick={() => startChange(a.id)}
+                  disabled={changeBusy}
+                >
+                  Change password
+                </button>
+                <button
+                  className="btn btn--sm btn--danger"
+                  onClick={() => remove(a.id)}
+                  disabled={changeBusy}
+                >
+                  Delete
+                </button>
+              </div>
             </li>
           ))}
         </ul>
+      )}
+
+      {editingId != null && (
+        <div
+          className="panel"
+          style={{
+            marginTop: 16,
+            background: "#f8fafc",
+            border: "1px dashed #cbd5e1",
+          }}
+        >
+          <div className="register-field" style={{ marginBottom: 14 }}>
+            <label htmlFor="change-password">New password</label>
+            <input
+              id="change-password"
+              type="password"
+              value={changePassword}
+              onChange={(e) => setChangePassword(e.target.value)}
+              placeholder="At least 6 characters"
+              autoFocus
+            />
+          </div>
+          <div style={{ display: "flex", gap: 10 }}>
+            <button
+              className="register-btn register-btn--primary"
+              onClick={() => savePassword(editingId)}
+              disabled={changeBusy || changePassword.length < 6}
+            >
+              {changeBusy ? "Saving…" : "Update password"}
+            </button>
+            <button
+              className="register-btn register-btn--ghost"
+              onClick={cancelChange}
+              disabled={changeBusy}
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
       )}
 
       {message && (

@@ -453,6 +453,17 @@ export async function deleteAdmin(id: number): Promise<boolean> {
   return res.affectedRows > 0;
 }
 
+export async function updateAdminPassword(
+  id: number,
+  password: string,
+): Promise<boolean> {
+  const [res] = await pool.execute<ResultSetHeader>(
+    `UPDATE project_crow_admins SET password_hash = ? WHERE id = ?`,
+    [hashPassword(password), id],
+  );
+  return res.affectedRows > 0;
+}
+
 export async function countAdmins(): Promise<number> {
   const [rows] = await pool.query<RowDataPacket[]>(
     `SELECT COUNT(*) AS c FROM project_crow_admins`,
