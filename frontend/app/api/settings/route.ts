@@ -1,13 +1,25 @@
 import { NextResponse } from "next/server";
-import { loadSettings, saveSettings } from "@/lib/settings";
+import {
+  earlyCheckinTargetIso,
+  loadSettings,
+  saveSettings,
+  type AppSettings,
+} from "@/lib/settings";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+function toResponse(settings: AppSettings) {
+  return NextResponse.json({
+    ...settings,
+    earlyCheckinTargetIso: earlyCheckinTargetIso(settings),
+  });
+}
+
 export async function GET() {
   try {
     const settings = await loadSettings();
-    return NextResponse.json(settings);
+    return toResponse(settings);
   } catch {
     return NextResponse.json(
       { error: "Could not load settings." },
@@ -24,17 +36,20 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Bad JSON." }, { status: 400 });
   }
 
-  const patch: Partial<{ earlyCheckinCountdownEnabled: boolean; earlyCheckinTargetIso: string }> = {};
+  const patch: Partial<AppSettings> = {};
+  if (typeof body.eventName === "string") {
+    patch.eventName = body.eventName.trim();
+  }
+  if (typeof body.eventStartIso === "string") {
+    patch.eventStartIso = body.eventStartIso;
+  }
   if (typeof body.earlyCheckinCountdownEnabled === "boolean") {
     patch.earlyCheckinCountdownEnabled = body.earlyCheckinCountdownEnabled;
-  }
-  if (typeof body.earlyCheckinTargetIso === "string") {
-    patch.earlyCheckinTargetIso = body.earlyCheckinTargetIso;
   }
 
   try {
     const settings = await saveSettings(patch);
-    return NextResponse.json(settings);
+    return toResponse(settings);
   } catch {
     return NextResponse.json(
       { error: "Could not save settings." },

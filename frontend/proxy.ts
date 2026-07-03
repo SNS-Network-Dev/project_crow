@@ -27,15 +27,17 @@ function isProtectedPage(pathname: string): boolean {
     pathname.startsWith("/avatar/") ||
     pathname === "/kiosk" ||
     pathname.startsWith("/kiosk/") ||
-    pathname === "/admin" ||
-    pathname.startsWith("/admin/")
+    pathname === "/list" ||
+    pathname.startsWith("/list/") ||
+    pathname === "/settings" ||
+    pathname.startsWith("/settings/")
   );
 }
 
 function isProtectedApi(pathname: string): boolean {
   // NOTE: '/api/checkin' prefix also covers '/api/checkins'. '/api/people'
   // covers '/api/people/[id]'. Public APIs (/api/register, /api/health,
-  // /api/login, /api/logout) are intentionally not listed here.
+  // /api/login, /api/logout, /api/settings) are intentionally not listed here.
   return (
     pathname.startsWith("/api/people") ||
     pathname.startsWith("/api/checkin") ||

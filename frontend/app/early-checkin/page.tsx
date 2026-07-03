@@ -39,8 +39,9 @@ export default function EarlyCheckinPage() {
   const [step, setStep] = useState<CheckinStep>("lookup");
   const [countdownEnabled, setCountdownEnabled] = useState(false);
   const [countdownTarget, setCountdownTarget] = useState(
-    "2025-07-17T17:00:00+08:00",
+    new Date().toISOString(),
   );
+  const [eventName, setEventName] = useState("the event");
   const [name, setName] = useState("");
   const [companyEmail, setCompanyEmail] = useState("");
   const [person, setPerson] = useState<FoundPerson | null>(null);
@@ -58,6 +59,9 @@ export default function EarlyCheckinPage() {
         }
         if (typeof data.earlyCheckinTargetIso === "string") {
           setCountdownTarget(data.earlyCheckinTargetIso);
+        }
+        if (typeof data.eventName === "string") {
+          setEventName(data.eventName);
         }
       })
       .catch(() => {
@@ -240,7 +244,11 @@ export default function EarlyCheckinPage() {
         {error && <div className="notice notice--error">{error}</div>}
 
         {step === "lookup" && !eventOpen && (
-          <CountdownTimer targetIso={countdownTarget} enabled={countdownEnabled} />
+          <CountdownTimer
+            targetIso={countdownTarget}
+            enabled={countdownEnabled}
+            eventName={eventName}
+          />
         )}
 
         {step === "lookup" && eventOpen && (

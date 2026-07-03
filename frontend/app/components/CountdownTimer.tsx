@@ -5,13 +5,18 @@ import { useEffect, useMemo, useState } from "react";
 interface Props {
   targetIso: string;
   enabled?: boolean;
+  eventName?: string;
 }
 
 function pad(n: number) {
   return n.toString().padStart(2, "0");
 }
 
-export default function CountdownTimer({ targetIso, enabled = true }: Props) {
+export default function CountdownTimer({
+  targetIso,
+  enabled = true,
+  eventName = "the event",
+}: Props) {
   const target = useMemo(() => new Date(targetIso).getTime(), [targetIso]);
   const [now, setNow] = useState(Date.now());
 
@@ -31,7 +36,9 @@ export default function CountdownTimer({ targetIso, enabled = true }: Props) {
 
   return (
     <div className="register-countdown">
-      <h2>Early check-in opens in</h2>
+      <h2>
+        Early check-in for {eventName} opens in
+      </h2>
       <div className="register-countdown__grid">
         <div className="register-countdown__unit">
           <span>{pad(days)}</span>
@@ -51,7 +58,7 @@ export default function CountdownTimer({ targetIso, enabled = true }: Props) {
         </div>
       </div>
       <p className="register-countdown__hint">
-        You can check in one hour before the event starts.
+        You can check in one hour before {eventName} starts.
       </p>
     </div>
   );

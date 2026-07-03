@@ -24,9 +24,9 @@ function getServerSnapshot(): boolean {
 }
 
 // Returns the page an operator should land on after exiting a tool surface.
-// Admins go back to the dashboard; guests fall through to /, which redirects
-// to /register.
+// Operators go back to the list; guests fall through to /, which redirects
+// to /early-checkin.
 export function useAdminHome(): string {
   const isAdmin = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
-  return isAdmin ? "/admin" : "/";
+  return isAdmin ? "/list" : "/";
 }

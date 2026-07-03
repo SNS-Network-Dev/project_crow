@@ -1,17 +1,16 @@
 "use client";
 
 import { useCallback, useState } from "react";
-import { useAdminData } from "./components/useAdminData";
-import PeopleTable from "./components/PeopleTable";
-import PersonDrawer from "./components/PersonDrawer";
-import CheckinsTable from "./components/CheckinsTable";
-import LiveClock from "./components/LiveClock";
-import SettingsPanel from "./components/SettingsPanel";
-import styles from "./components/admin.module.css";
+import { useAdminData } from "../admin/components/useAdminData";
+import PeopleTable from "../admin/components/PeopleTable";
+import PersonDrawer from "../admin/components/PersonDrawer";
+import CheckinsTable from "../admin/components/CheckinsTable";
+import LiveClock from "../admin/components/LiveClock";
+import styles from "../admin/components/admin.module.css";
 
-type Tab = "people" | "checkins" | "notCheckedIn" | "settings";
+type Tab = "people" | "checkins" | "notCheckedIn";
 
-export default function AdminPage() {
+export default function ListPage() {
   const data = useAdminData();
   const [tab, setTab] = useState<Tab>("people");
   const [search, setSearch] = useState("");
@@ -43,7 +42,7 @@ export default function AdminPage() {
     <main className="wrap wrap--wide">
       <div className={styles.pageHeader}>
         <div>
-          <h1>Admin</h1>
+          <h1>List</h1>
           <p className="subtitle">People directory and recent check-ins.</p>
         </div>
         <LiveClock />
@@ -69,12 +68,6 @@ export default function AdminPage() {
           onClick={() => setTab("notCheckedIn")}
         >
           Not checked in ({notCheckedInCount})
-        </button>
-        <button
-          className={tab === "settings" ? "tab tab--active" : "tab"}
-          onClick={() => setTab("settings")}
-        >
-          Settings
         </button>
         <input
           className="tabSearch"
@@ -118,8 +111,6 @@ export default function AdminPage() {
           checkedInFilter="notCheckedIn"
         />
       )}
-
-      {tab === "settings" && <SettingsPanel />}
 
       <PersonDrawer
         person={selectedPerson}

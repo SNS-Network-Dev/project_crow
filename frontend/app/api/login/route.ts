@@ -12,7 +12,7 @@ export async function POST(request: Request) {
     // No passphrase configured -> admin is open (see proxy.ts). Nothing to log
     // into; tell the client so the login page can explain.
     return NextResponse.json(
-      { error: "No admin password is configured. Admin is open — just visit /admin." },
+      { error: "No admin password is configured. Operator area is open — just visit /list." },
       { status: 503 },
     );
   }

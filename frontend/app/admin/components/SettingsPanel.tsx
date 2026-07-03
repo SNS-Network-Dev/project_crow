@@ -3,13 +3,15 @@
 import { useCallback, useEffect, useState } from "react";
 import { BASE_PATH } from "@/lib/basePath";
 
-export interface AppSettings {
+export interface AppSettingsResponse {
+  eventName: string;
+  eventStartIso: string;
   earlyCheckinCountdownEnabled: boolean;
   earlyCheckinTargetIso: string;
 }
 
 export default function SettingsPanel() {
-  const [settings, setSettings] = useState<AppSettings | null>(null);
+  const [settings, setSettings] = useState<AppSettingsResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
@@ -18,7 +20,7 @@ export default function SettingsPanel() {
     let cancelled = false;
     fetch(`${BASE_PATH}/api/settings`, { cache: "no-store" })
       .then((res) => res.json())
-      .then((data) => {
+      .then((data: AppSettingsResponse) => {
         if (cancelled) return;
         setSettings(data);
       })
@@ -34,7 +36,7 @@ export default function SettingsPanel() {
     };
   }, []);
 
-  const toggle = useCallback(async () => {
+  const save = useCallback(async () => {
     if (!settings || saving) return;
     setSaving(true);
     setMessage(null);
@@ -43,7 +45,9 @@ export default function SettingsPanel() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          earlyCheckinCountdownEnabled: !settings.earlyCheckinCountdownEnabled,
+          eventName: settings.eventName,
+          eventStartIso: settings.eventStartIso,
+          earlyCheckinCountdownEnabled: settings.earlyCheckinCountdownEnabled,
         }),
       });
       const data = await res.json().catch(() => ({}));
@@ -51,7 +55,7 @@ export default function SettingsPanel() {
         setMessage(data.error ?? "Failed to save.");
       } else {
         setSettings(data);
-        setMessage("Setting saved.");
+        setMessage("Settings saved.");
       }
     } catch {
       setMessage("Network error.");
@@ -65,9 +69,47 @@ export default function SettingsPanel() {
     return <p className="subtitle">Loading settings…</p>;
   }
 
+  const isError =
+    message &&
+    (message.includes("error") ||
+      message.includes("Failed") ||
+      message.includes("Could not"));
+
   return (
-    <div className="panel" style={{ maxWidth: 520 }}>
-      <h2 style={{ marginBottom: 18 }}>Event settings</h2>
+    <div className="panel" style={{ maxWidth: 560 }}>
+      <h2 style={{ marginBottom: 22 }}>Event settings</h2>
+
+      <div className="register-field" style={{ marginBottom: 16 }}>
+        <label htmlFor="settings-event-name">Event name</label>
+        <input
+          id="settings-event-name"
+          type="text"
+          value={settings.eventName}
+          onChange={(e) =>
+            setSettings((s) => (s ? { ...s, eventName: e.target.value } : s))
+          }
+          placeholder="e.g. Project Crow Annual Dinner"
+        />
+      </div>
+
+      <div className="register-field" style={{ marginBottom: 22 }}>
+        <label htmlFor="settings-event-start">Event start time</label>
+        <input
+          id="settings-event-start"
+          type="datetime-local"
+          value={settings.eventStartIso.slice(0, 16)}
+          onChange={(e) => {
+            const local = e.target.value;
+            if (!local) return;
+            // Convert local datetime-local value to an ISO string with MYT offset.
+            const withOffset = `${local}:00+08:00`;
+            setSettings((s) => (s ? { ...s, eventStartIso: withOffset } : s));
+          }}
+        />
+        <p className="subtitle" style={{ marginTop: 6, fontSize: "0.85rem" }}>
+          Times are in Malaysia Time (UTC+8).
+        </p>
+      </div>
 
       <div
         style={{
@@ -83,25 +125,32 @@ export default function SettingsPanel() {
         <div>
           <strong>Early check-in countdown</strong>
           <p className="subtitle" style={{ margin: "4px 0 0" }}>
-            Show a countdown timer on /early-checkin before the event opens.
+            Show a countdown on /early-checkin until one hour before the event.
           </p>
         </div>
         <button
-          className={`btn ${settings.earlyCheckinCountdownEnabled ? "btn--danger" : "btn--primary"}`}
-          onClick={toggle}
+          type="button"
+          role="switch"
+          aria-checked={settings.earlyCheckinCountdownEnabled}
+          className={`register-btn ${
+            settings.earlyCheckinCountdownEnabled
+              ? "register-btn--primary"
+              : "register-btn--ghost"
+          }`}
+          onClick={() =>
+            setSettings((s) =>
+              s ? { ...s, earlyCheckinCountdownEnabled: !s.earlyCheckinCountdownEnabled } : s
+            )
+          }
           disabled={saving}
         >
-          {saving
-            ? "Saving…"
-            : settings.earlyCheckinCountdownEnabled
-              ? "Disable"
-              : "Enable"}
+          {settings.earlyCheckinCountdownEnabled ? "On" : "Off"}
         </button>
       </div>
 
       <div style={{ marginTop: 16 }}>
         <p className="subtitle">
-          Countdown target: {" "}
+          Early check-in opens at:{" "}
           <strong>
             {new Date(settings.earlyCheckinTargetIso).toLocaleString("en-MY", {
               dateStyle: "medium",
@@ -111,9 +160,18 @@ export default function SettingsPanel() {
         </p>
       </div>
 
+      <button
+        className="register-btn register-btn--primary register-btn--block"
+        style={{ marginTop: 22 }}
+        onClick={save}
+        disabled={saving}
+      >
+        {saving ? "Saving…" : "Save settings"}
+      </button>
+
       {message && (
         <div
-          className={`notice ${message.includes("error") || message.includes("Failed") || message.includes("Could not") ? "notice--error" : "notice--ok"}`}
+          className={`notice ${isError ? "notice--error" : "notice--ok"}`}
           style={{ marginTop: 16 }}
         >
           {message}

@@ -5,13 +5,26 @@ import { join } from "path";
 // that don't justify a database table, e.g. the early-check-in countdown timer.
 
 const DEFAULTS: AppSettings = {
+  eventName: "Project Crow Event",
+  eventStartIso: "2025-07-17T18:00:00+08:00",
   earlyCheckinCountdownEnabled: false,
-  earlyCheckinTargetIso: "2025-07-17T17:00:00+08:00", // one hour before 6pm
 };
 
 export interface AppSettings {
+  eventName: string;
+  eventStartIso: string;
   earlyCheckinCountdownEnabled: boolean;
-  earlyCheckinTargetIso: string;
+}
+
+// Derived: early check-in opens one hour before the event starts.
+export function earlyCheckinTargetIso(settings: AppSettings): string {
+  const start = new Date(settings.eventStartIso);
+  if (Number.isNaN(start.getTime())) {
+    const fallback = new Date();
+    fallback.setHours(fallback.getHours() + 1);
+    return fallback.toISOString();
+  }
+  return new Date(start.getTime() - 60 * 60 * 1000).toISOString();
 }
 
 const path = process.env.SETTINGS_PATH ?? join(process.cwd(), "data", "settings.json");

@@ -4,17 +4,17 @@ import { Suspense, useCallback, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { BASE_PATH } from "@/lib/basePath";
 
-// Operators log in here to reach /checkin, /avatar, /kiosk, /admin. The look
-// mirrors aimy_chat's security/login_page.php (gradient + grid background,
-// glass card, "Welcome Back!"). Guests never see this — they go to /register.
-// See proxy.ts for the gate and /api/login for the passphrase check.
+// Operators log in here to reach /checkin, /avatar, /kiosk, /list, /settings.
+// The look mirrors aimy_chat's security/login_page.php (gradient + grid
+// background, glass card, "Welcome Back!"). Guests never see this — they go to
+// /early-checkin. See proxy.ts for the gate and /api/login for the passphrase check.
 
 function LoginForm() {
   const router = useRouter();
   const params = useSearchParams();
   // Only allow internal return paths to avoid open-redirect.
   const rawNext = params.get("next") ?? "";
-  const next = rawNext.startsWith("/") ? rawNext : "/admin";
+  const next = rawNext.startsWith("/") ? rawNext : "/list";
 
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
