@@ -130,12 +130,48 @@ export default function RegisterPage() {
 
   const DASH = "—";
 
+  const stepIndex: Record<RegisterStep, number> = {
+    lookup: 1,
+    confirm: 2,
+    ready: 3,
+    review: 4,
+    done: 5,
+  };
+  const stepLabel: Record<number, string> = {
+    1: "Find invitation",
+    2: "Confirm details",
+    3: "Photo guide",
+    4: "Review photo",
+    5: "Done",
+  };
+
   return (
     <main className="wrap">
       <div className="panel register-card">
-        <h1 className="register-title register-title--in-card">
-          Skip the queue and register for face check in
-        </h1>
+        {step === "lookup" && (
+          <h1 className="register-title register-title--in-card">
+            Skip the queue and register for face check in
+          </h1>
+        )}
+
+        <div className="register-stepper" aria-label="Registration progress">
+          {[1, 2, 3, 4, 5].map((n) => (
+            <div
+              key={n}
+              className={`register-step${
+                n === stepIndex[step]
+                  ? " register-step--active"
+                  : n < stepIndex[step]
+                    ? " register-step--completed"
+                    : ""
+              }`}
+            >
+              <div className="register-step__dot">{n < stepIndex[step] ? "✓" : n}</div>
+              <span className="register-step__label">{stepLabel[n]}</span>
+            </div>
+          ))}
+        </div>
+
         {error && <div className="notice notice--error">{error}</div>}
         {doneMsg && <div className="notice notice--ok">{doneMsg}</div>}
 
@@ -162,7 +198,7 @@ export default function RegisterPage() {
               />
             </div>
             <button
-              className="register-submit"
+              className="register-btn register-btn--primary register-btn--block"
               onClick={lookup}
               disabled={busy || !name.trim() || !companyEmail.trim()}
             >
@@ -173,7 +209,7 @@ export default function RegisterPage() {
 
         {step === "confirm" && person && (
           <>
-            <h2 style={{ marginBottom: 8 }}>Is this you?</h2>
+            <h2 className="register-step-heading">Is this you?</h2>
             <div className="register-confirm-card">
               <dl>
                 <dt>Full Name</dt>
@@ -192,15 +228,15 @@ export default function RegisterPage() {
                 <dd>{person.remarks ?? DASH}</dd>
               </dl>
             </div>
-            <div className="row" style={{ marginTop: 18 }}>
+            <div className="register-actions">
               <button
-                className="btn btn--lg btn--block"
+                className="register-btn register-btn--primary register-btn--block"
                 onClick={() => setStep("ready")}
               >
                 Yes, this is me
               </button>
               <button
-                className="btn btn--ghost btn--lg btn--block"
+                className="register-btn register-btn--ghost register-btn--block"
                 onClick={resetAll}
               >
                 No, start over
@@ -211,34 +247,37 @@ export default function RegisterPage() {
 
         {step === "ready" && (
           <>
-            <h2 style={{ marginBottom: 12 }}>Ready for your selfie?</h2>
-            <div className="notice notice--info" style={{ marginBottom: 16 }}>
-              Make sure you have good lighting, a plain background, and no
-              sunglasses or mask. Line up your face clearly on the next screen.
+            <h2 className="register-step-heading">Ready for your selfie?</h2>
+            <ul className="register-requirements">
+              <li>Good lighting on your face</li>
+              <li>Plain background behind you</li>
+              <li>No sunglasses, mask, or hat</li>
+              <li>Face lined up clearly on the next screen</li>
+            </ul>
+            <div className="register-privacy-notice">
+              <strong>Your privacy matters.</strong> We do not keep your photos
+              for model training. Your photo will be deleted after the event.
             </div>
-            <p className="subtitle" style={{ marginBottom: 24 }}>
-              We do not keep your photos for model training. Your photo will be
-              deleted after the event.
-            </p>
-            <button
-              className="btn btn--lg btn--block"
-              onClick={() => setCameraOpen(true)}
-            >
-              I&apos;m ready — take my photo
-            </button>
-            <button
-              className="btn btn--ghost btn--lg btn--block"
-              style={{ marginTop: 10 }}
-              onClick={resetAll}
-            >
-              Cancel
-            </button>
+            <div className="register-actions">
+              <button
+                className="register-btn register-btn--primary register-btn--block"
+                onClick={() => setCameraOpen(true)}
+              >
+                I&apos;m ready — take my photo
+              </button>
+              <button
+                className="register-btn register-btn--ghost register-btn--block"
+                onClick={resetAll}
+              >
+                Cancel
+              </button>
+            </div>
           </>
         )}
 
         {(step === "review" || step === "done") && preview && (
           <>
-            <h2 style={{ marginBottom: 12 }}>
+            <h2 className="register-step-heading">
               {step === "done"
                 ? "Enrollment complete"
                 : "Are you satisfied with this photo?"}
@@ -274,16 +313,16 @@ export default function RegisterPage() {
                     .
                   </label>
                 </div>
-                <div className="row" style={{ marginTop: 18 }}>
+                <div className="register-actions register-actions--row">
                   <button
-                    className="btn btn--lg"
+                    className="register-btn register-btn--primary"
                     onClick={enroll}
                     disabled={busy || !consent}
                   >
                     {busy ? "Saving…" : "Yes, save my face check-in"}
                   </button>
                   <button
-                    className="btn btn--ghost btn--lg"
+                    className="register-btn register-btn--ghost"
                     onClick={() => {
                       setPhotoBlob(null);
                       setConsent(false);
@@ -298,13 +337,14 @@ export default function RegisterPage() {
             )}
 
             {step === "done" && (
-              <button
-                className="btn btn--lg btn--block"
-                style={{ marginTop: 18 }}
-                onClick={resetAll}
-              >
-                Register another person
-              </button>
+              <div className="register-actions">
+                <button
+                  className="register-btn register-btn--primary register-btn--block"
+                  onClick={resetAll}
+                >
+                  Register another person
+                </button>
+              </div>
             )}
           </>
         )}
