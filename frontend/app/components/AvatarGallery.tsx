@@ -1,10 +1,8 @@
 "use client";
 
-import Link from "next/link";
 import qrcode from "qrcode-generator";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { BASE_PATH } from "@/lib/basePath";
-import { useAdminHome } from "./useAdminHome";
 
 // The pickup "live wall". Polls the gallery feed; shows every finished capture
 // newest-first grouped by session. A guest finds their photo, taps the top-right
@@ -59,7 +57,6 @@ export default function AvatarGallery() {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [qrUrl, setQrUrl] = useState<string | null>(null);
   const [modalPoster, setModalPoster] = useState<Poster | null>(null);
-  const homeHref = useAdminHome();
   const timer = useRef<number | null>(null);
 
   const poll = useCallback(async () => {
@@ -125,16 +122,7 @@ export default function AvatarGallery() {
   return (
     <div className="gallery gallery--with-sidebar">
       <header className="gallery-head">
-        <div>
-          <h1>Photo gallery</h1>
-          <p className="subtitle">
-            Tap a photo to view it larger. Use the top-right checkmark to select
-            photos for download.
-          </p>
-        </div>
-        <Link href={homeHref} className="gallery-home" aria-label="Home">
-          <span className="kiosk-x" aria-hidden />
-        </Link>
+        <h1>Photo gallery</h1>
       </header>
 
       {loaded && sets.length === 0 && (

@@ -1585,9 +1585,11 @@ th {
   background: var(--bg);
 }
 .gallery--with-sidebar {
-  /* when the sidebar is present the page sits inside .appMain; keep the same
-     padding so the gallery still feels like a tool surface, just with nav. */
+  /* when the sidebar is present the page sits inside .appMain; the sidebar is
+     a sibling flex item, so the gallery just fills the remaining width. */
   min-height: auto;
+  width: 100%;
+  min-width: 0;
 }
 .gallery-head {
   display: flex;
@@ -1597,17 +1599,7 @@ th {
   margin-bottom: 26px;
 }
 .gallery-head h1 {
-  margin-bottom: 4px;
-}
-.gallery-home {
-  flex: 0 0 auto;
-  width: 40px;
-  height: 40px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: #16191d;
-  border-radius: 50%;
+  margin-bottom: 0;
 }
 .gallery-empty {
   text-align: center;
@@ -1650,9 +1642,16 @@ th {
   grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
   gap: 14px;
 }
+/* Collapsed sidebar gives the main area more room; scale tiles a bit. */
+.sidebar--collapsed ~ .appMain .gset-thumbs {
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+}
 @media (min-width: 1200px) {
   .gset-thumbs {
-    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  }
+  .sidebar--collapsed ~ .appMain .gset-thumbs {
+    grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
   }
 }
 .gthumb {
@@ -1707,10 +1706,6 @@ th {
   background: #fff;
 }
 .gthumb .gthumb-check {
-  opacity: 0;
-}
-.gthumb:hover .gthumb-check,
-.gthumb--selected .gthumb-check {
   opacity: 1;
 }
 .gthumb--selected .gthumb-check {
@@ -1721,13 +1716,14 @@ th {
   display: inline-block;
   width: 7px;
   height: 12px;
-  border-right: 2px solid #fff;
-  border-bottom: 2px solid #fff;
+  border-right: 2px solid rgba(0, 0, 0, 0.55);
+  border-bottom: 2px solid rgba(0, 0, 0, 0.55);
   transform: rotate(45deg) translate(-1px, -1px);
-  opacity: 0;
+  opacity: 1;
 }
 .gthumb--selected .gthumb-checkmark {
-  opacity: 1;
+  border-right-color: #fff;
+  border-bottom-color: #fff;
 }
 .gallery-bar {
   position: fixed;
