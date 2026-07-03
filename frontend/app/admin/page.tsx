@@ -5,6 +5,8 @@ import { useAdminData } from "./components/useAdminData";
 import PeopleTable from "./components/PeopleTable";
 import PersonDrawer from "./components/PersonDrawer";
 import CheckinsTable from "./components/CheckinsTable";
+import LiveClock from "./components/LiveClock";
+import styles from "./components/admin.module.css";
 
 type Tab = "people" | "checkins" | "notCheckedIn";
 
@@ -38,8 +40,13 @@ export default function AdminPage() {
 
   return (
     <main className="wrap wrap--wide">
-      <h1>Admin</h1>
-      <p className="subtitle">People directory and recent check-ins.</p>
+      <div className={styles.pageHeader}>
+        <div>
+          <h1>Admin</h1>
+          <p className="subtitle">People directory and recent check-ins.</p>
+        </div>
+        <LiveClock />
+      </div>
 
       {data.error && <div className="notice notice--error">{data.error}</div>}
 

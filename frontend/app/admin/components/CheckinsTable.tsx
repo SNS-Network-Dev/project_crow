@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import type { Checkin, Person } from "./useAdminData";
 import styles from "./admin.module.css";
 
@@ -14,17 +14,6 @@ function initials(name: string): string {
   if (parts.length === 0) return "?";
   if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
   return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
-}
-
-function formatDateTime(d: Date): string {
-  // 3/7/2026 11:06 AM
-  return d.toLocaleString("en-US", {
-    year: "numeric",
-    month: "numeric",
-    day: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-  });
 }
 
 interface Props {
@@ -44,19 +33,7 @@ export default function CheckinsTable({
 }: Props) {
   const [pageSize, setPageSize] = useState<string>("10");
   const [page, setPage] = useState(1);
-  const [now, setNow] = useState<Date | null>(null);
   const [deletingId, setDeletingId] = useState<number | null>(null);
-
-  // Hydrate the clock on mount (via setTimeout so setState runs in a callback),
-  // then tick every second.
-  useEffect(() => {
-    const t1 = window.setTimeout(() => setNow(new Date()), 0);
-    const id = window.setInterval(() => setNow(new Date()), 1000);
-    return () => {
-      window.clearTimeout(t1);
-      window.clearInterval(id);
-    };
-  }, []);
 
   const peopleById = useMemo(() => {
     const m = new Map<number, Person>();
@@ -99,12 +76,6 @@ export default function CheckinsTable({
 
   return (
     <div>
-      <div className={styles.toolbar}>
-        <span className={styles.liveDot} title="Auto-refreshes every 10s" />
-        <span className={styles.liveLabel}>Live</span>
-        {now && <span className={styles.liveTime}>{formatDateTime(now)}</span>}
-      </div>
-
       <div className="admin-table-wrapper">
         <table className={`admin-table ${styles.adminTable}`}>
           <thead>
