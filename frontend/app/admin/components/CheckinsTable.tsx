@@ -21,6 +21,7 @@ interface Props {
   people: Person[];
   checkins: Checkin[];
   search: string;
+  onSelect: (id: number) => void;
   onDeleteCheckin: (id: number) => Promise<boolean>;
 }
 
@@ -30,6 +31,7 @@ export default function CheckinsTable({
   people,
   checkins,
   search,
+  onSelect,
   onDeleteCheckin,
 }: Props) {
   const toast = useToast();
@@ -106,7 +108,11 @@ export default function CheckinsTable({
               </tr>
             )}
             {paged.map(({ checkin: c, person: p }, i) => (
-              <tr key={c.id}>
+              <tr
+                key={c.id}
+                className={styles.row}
+                onClick={() => p && onSelect(p.id)}
+              >
                 <td className="td-no">{start + i + 1}</td>
                 <td className="td-photo">
                   {p?.photo_url ? (
@@ -145,7 +151,10 @@ export default function CheckinsTable({
                     type="button"
                     className="btn btn--danger btn--sm"
                     disabled={deletingId === c.id}
-                    onClick={() => handleUndo(c)}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleUndo(c);
+                    }}
                   >
                     {deletingId === c.id ? "Undoing…" : "Undo"}
                   </button>

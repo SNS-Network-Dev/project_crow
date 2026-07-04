@@ -187,6 +187,15 @@ export default function PersonDrawer({ person, onPatch, onDelete, onClose }: Pro
         <div className={styles.drawerBody}>
           {error && <div className="notice notice--error">{error}</div>}
 
+          <div className={styles.drawerPhoto}>
+            {person.photo_url ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={person.photo_url} alt={person.name} />
+            ) : (
+              <span className={styles.drawerPhotoPlaceholder}>{initials(person.name)}</span>
+            )}
+          </div>
+
           {mode === "view" ? (
             <>
               <section className={styles.detailSection}>

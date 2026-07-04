@@ -133,6 +133,7 @@ export default function ListPage() {
           people={data.people}
           checkins={data.checkins}
           search={search}
+          onSelect={openDrawer}
           onDeleteCheckin={data.deleteCheckinById}
         />
       )}
