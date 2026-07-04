@@ -187,29 +187,33 @@ export default function PersonDrawer({ person, onPatch, onDelete, onClose }: Pro
         <div className={styles.drawerBody}>
           {error && <div className="notice notice--error">{error}</div>}
 
-          <div className={styles.drawerPhoto}>
-            {person.photo_url ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={person.photo_url} alt={person.name} />
-            ) : (
-              <span className={styles.drawerPhotoPlaceholder}>{initials(person.name)}</span>
-            )}
-          </div>
-
           {mode === "view" ? (
             <>
-              <section className={styles.detailSection}>
-                <h3 className={styles.detailHeading}>Personal</h3>
-                <DetailField label="Contact number" value={person.contact_number} />
-                <DetailField label="Personal email" value={person.email} />
-              </section>
-              <section className={styles.detailSection}>
-                <h3 className={styles.detailHeading}>Company</h3>
-                <DetailField label="Company email" value={person.company_email} />
-                <DetailField label="Company" value={person.full_company_name} />
-                <DetailField label="Designation" value={person.designation} />
-                <DetailField label="Invited by" value={person.invited_by} />
-              </section>
+              <div className={styles.drawerTop}>
+                <div className={styles.drawerPhoto}>
+                  {person.photo_url ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={person.photo_url} alt={person.name} />
+                  ) : (
+                    <span className={styles.drawerPhotoPlaceholder}>{initials(person.name)}</span>
+                  )}
+                </div>
+                <div className={styles.drawerSummary}>
+                  <section className={styles.detailSection}>
+                    <h3 className={styles.detailHeading}>Personal</h3>
+                    <DetailField label="Contact number" value={person.contact_number} />
+                    <DetailField label="Personal email" value={person.email} />
+                  </section>
+                  <section className={styles.detailSection}>
+                    <h3 className={styles.detailHeading}>Company</h3>
+                    <DetailField label="Company email" value={person.company_email} />
+                    <DetailField label="Company" value={person.full_company_name} />
+                    <DetailField label="Designation" value={person.designation} />
+                    <DetailField label="Invited by" value={person.invited_by} />
+                  </section>
+                </div>
+              </div>
+
               <section className={styles.detailSection}>
                 <h3 className={styles.detailHeading}>Notes</h3>
                 <DetailField label="Remarks" value={person.remarks} />
