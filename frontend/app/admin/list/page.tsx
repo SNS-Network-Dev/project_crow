@@ -1,17 +1,20 @@
 "use client";
 
 import { useCallback, useState } from "react";
+import { BASE_PATH } from "@/lib/basePath";
 import { useAdminData } from "../components/useAdminData";
 import PeopleTable from "../components/PeopleTable";
 import PersonDrawer from "../components/PersonDrawer";
 import CheckinsTable from "../components/CheckinsTable";
 import LiveClock from "../components/LiveClock";
+import { useToast } from "../../components/ToastProvider";
 import styles from "../components/admin.module.css";
 
 type Tab = "people" | "checkins" | "notCheckedIn";
 
 export default function ListPage() {
   const data = useAdminData();
+  const toast = useToast();
   const [tab, setTab] = useState<Tab>("people");
   const [search, setSearch] = useState("");
   const [selectedId, setSelectedId] = useState<number | null>(null);
@@ -31,6 +34,36 @@ export default function ListPage() {
       return ok;
     },
     [data, closeDrawer],
+  );
+
+  const handleManualCheckin = useCallback(
+    async (id: number, name: string) => {
+      try {
+        const res = await fetch(`${BASE_PATH}/api/early-checkin/manual`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ person_id: id }),
+        });
+        const body = (await res.json().catch(() => ({}))) as {
+          ok?: boolean;
+          alreadyCheckedIn?: boolean;
+          error?: string;
+        };
+        if (!res.ok) {
+          toast.show(body.error ?? "Could not check in.", "error");
+          return;
+        }
+        if (body.alreadyCheckedIn) {
+          toast.show(`${name} is already checked in.`, "info");
+          return;
+        }
+        toast.show(`${name} checked in.`, "ok");
+        await data.refreshAll();
+      } catch {
+        toast.show("Network error. Try again.", "error");
+      }
+    },
+    [data, toast],
   );
 
   const notCheckedInCount =
@@ -89,7 +122,9 @@ export default function ListPage() {
           checkins={data.checkins}
           search={search}
           onSelect={openDrawer}
+          onCheckin={handleManualCheckin}
           checkedInFilter="all"
+          prioritizeNotCheckedIn
         />
       )}
 
@@ -108,6 +143,7 @@ export default function ListPage() {
           checkins={data.checkins}
           search={search}
           onSelect={openDrawer}
+          onCheckin={handleManualCheckin}
           checkedInFilter="notCheckedIn"
         />
       )}

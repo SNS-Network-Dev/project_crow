@@ -260,6 +260,11 @@
   white-space: nowrap;
 }
 
+.colCheckin {
+  width: 110px;
+  text-align: center;
+}
+
 .colUndo {
   width: 80px;
   text-align: center;
@@ -276,7 +281,8 @@
   .colDesignation,
   .colInvited,
   .colRemarks,
-  .colRegistered {
+  .colRegistered,
+  .colCheckin {
     display: none;
   }
 }

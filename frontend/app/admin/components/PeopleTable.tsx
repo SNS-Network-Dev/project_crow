@@ -20,7 +20,9 @@ interface Props {
   checkins: Checkin[];
   search: string;
   onSelect: (id: number) => void;
+  onCheckin?: (id: number, name: string) => void;
   checkedInFilter?: CheckedInFilter;
+  prioritizeNotCheckedIn?: boolean;
 }
 
 const PAGE_SIZE_OPTIONS = ["10", "20", "50", "100", "200", "all"];
@@ -30,7 +32,9 @@ export default function PeopleTable({
   checkins,
   search,
   onSelect,
+  onCheckin,
   checkedInFilter = "all",
+  prioritizeNotCheckedIn = false,
 }: Props) {
   const [pageSize, setPageSize] = useState<string>("10");
   const [page, setPage] = useState(1);
@@ -49,15 +53,26 @@ export default function PeopleTable({
     }
 
     const q = search.trim().toLowerCase();
-    if (!q) return rows;
-    return rows.filter((p) => {
-      const hay =
-        `${p.name} ${p.email ?? ""} ${p.full_company_name ?? ""} ${p.designation ?? ""} ${
-          p.invited_by ?? ""
-        } ${p.remarks ?? ""}`.toLowerCase();
-      return hay.includes(q);
-    });
-  }, [people, checkedInIds, checkedInFilter, search]);
+    if (q) {
+      rows = rows.filter((p) => {
+        const hay =
+          `${p.name} ${p.email ?? ""} ${p.full_company_name ?? ""} ${p.designation ?? ""} ${
+            p.invited_by ?? ""
+          } ${p.remarks ?? ""}`.toLowerCase();
+        return hay.includes(q);
+      });
+    }
+
+    if (prioritizeNotCheckedIn) {
+      rows = [...rows].sort((a, b) => {
+        const aIn = checkedInIds.has(a.id) ? 1 : 0;
+        const bIn = checkedInIds.has(b.id) ? 1 : 0;
+        return aIn - bIn;
+      });
+    }
+
+    return rows;
+  }, [people, checkedInIds, checkedInFilter, search, prioritizeNotCheckedIn]);
 
   const size = pageSize === "all" ? Infinity : Number(pageSize);
   const totalPages =
@@ -81,62 +96,86 @@ export default function PeopleTable({
               <th className={styles.colRemarks}>Remarks</th>
               <th className={styles.colInvited}>Invited by</th>
               <th className={styles.colRegistered}>Registered when</th>
+              {onCheckin && <th className={styles.colCheckin}>Check in</th>}
               <th className="td-qr">QR</th>
             </tr>
           </thead>
           <tbody>
             {filtered.length === 0 && (
               <tr>
-                <td colSpan={9} className={styles.emptyRow}>
+                <td
+                  colSpan={onCheckin ? 10 : 9}
+                  className={styles.emptyRow}
+                >
                   No guests match this search.
                 </td>
               </tr>
             )}
-            {paged.map((p, i) => (
-              <tr
-                key={p.id}
-                className={styles.row}
-                onClick={() => onSelect(p.id)}
-              >
-                <td className="td-no">{start + i + 1}</td>
-                <td className="td-photo">
-                  {p.photo_url ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={p.photo_url} alt={p.name} />
-                  ) : (
-                    <span className="avatar-placeholder">
-                      {initials(p.name)}
-                    </span>
-                  )}
-                </td>
-                <td className={styles.colDesignation}>
-                  {p.designation ?? DASH}
-                </td>
-                <td className="td-name">{p.name}</td>
-                <td className={styles.colCompany}>
-                  {p.full_company_name ?? DASH}
-                </td>
-                <td
-                  className={styles.colRemarks}
-                  title={p.remarks ?? undefined}
+            {paged.map((p, i) => {
+              const isCheckedIn = checkedInIds.has(p.id);
+              return (
+                <tr
+                  key={p.id}
+                  className={styles.row}
+                  onClick={() => onSelect(p.id)}
                 >
-                  {p.remarks ?? DASH}
-                </td>
-                <td className={styles.colInvited}>{p.invited_by ?? DASH}</td>
-                <td className={styles.colRegistered}>
-                  {new Date(p.created_at).toLocaleString("en-US", {
-                    year: "numeric",
-                    month: "numeric",
-                    day: "numeric",
-                    hour: "numeric",
-                    minute: "2-digit",
-                  })}
-                </td>
-                <td className="td-qr" title={p.qr_code_path ?? undefined}>
-                  {p.qr_code_path ?? DASH}
-                </td>
-              </tr>
-            ))}
+                  <td className="td-no">{start + i + 1}</td>
+                  <td className="td-photo">
+                    {p.photo_url ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={p.photo_url} alt={p.name} />
+                    ) : (
+                      <span className="avatar-placeholder">
+                        {initials(p.name)}
+                      </span>
+                    )}
+                  </td>
+                  <td className={styles.colDesignation}>
+                    {p.designation ?? DASH}
+                  </td>
+                  <td className="td-name">{p.name}</td>
+                  <td className={styles.colCompany}>
+                    {p.full_company_name ?? DASH}
+                  </td>
+                  <td
+                    className={styles.colRemarks}
+                    title={p.remarks ?? undefined}
+                  >
+                    {p.remarks ?? DASH}
+                  </td>
+                  <td className={styles.colInvited}>{p.invited_by ?? DASH}</td>
+                  <td className={styles.colRegistered}>
+                    {new Date(p.created_at).toLocaleString("en-US", {
+                      year: "numeric",
+                      month: "numeric",
+                      day: "numeric",
+                      hour: "numeric",
+                      minute: "2-digit",
+                    })}
+                  </td>
+                  {onCheckin && (
+                    <td className={styles.colCheckin}>
+                      <button
+                        type="button"
+                        className={`btn btn--sm ${
+                          isCheckedIn ? "btn--ghost" : ""
+                        }`}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onCheckin(p.id, p.name);
+                        }}
+                        disabled={isCheckedIn}
+                      >
+                        {isCheckedIn ? "Checked in" : "Check in"}
+                      </button>
+                    </td>
+                  )}
+                  <td className="td-qr" title={p.qr_code_path ?? undefined}>
+                    {p.qr_code_path ?? DASH}
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>

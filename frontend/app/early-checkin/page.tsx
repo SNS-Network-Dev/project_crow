@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { BASE_PATH } from "@/lib/basePath";
+import { useToast } from "../components/ToastProvider";
 import FaceCapture from "../components/FaceCapture";
 import CountdownTimer from "../components/CountdownTimer";
 
@@ -36,6 +37,7 @@ interface DoneInfo {
 const DASH = "—";
 
 export default function EarlyCheckinPage() {
+  const toast = useToast();
   const [step, setStep] = useState<CheckinStep>("lookup");
   const [countdownEnabled, setCountdownEnabled] = useState(false);
   const [countdownTarget, setCountdownTarget] = useState(
@@ -47,7 +49,6 @@ export default function EarlyCheckinPage() {
   const [person, setPerson] = useState<FoundPerson | null>(null);
   const [cameraOpen, setCameraOpen] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [doneInfo, setDoneInfo] = useState<DoneInfo | null>(null);
 
   useEffect(() => {
@@ -76,12 +77,10 @@ export default function EarlyCheckinPage() {
     setPerson(null);
     setCameraOpen(false);
     setBusy(false);
-    setError(null);
     setDoneInfo(null);
   }, []);
 
   const lookup = useCallback(async () => {
-    setError(null);
     setBusy(true);
     try {
       const res = await fetch(`${BASE_PATH}/api/register/lookup`, {
@@ -94,7 +93,7 @@ export default function EarlyCheckinPage() {
       });
       const body = await res.json().catch(() => ({}));
       if (!res.ok) {
-        setError(body.error ?? "Lookup failed.");
+        toast.show(body.error ?? "Lookup failed.", "error");
         return;
       }
       setPerson({
@@ -104,15 +103,14 @@ export default function EarlyCheckinPage() {
       });
       setStep("confirm");
     } catch {
-      setError("Network error. Try again.");
+      toast.show("Network error. Try again.", "error");
     } finally {
       setBusy(false);
     }
-  }, [name, companyEmail]);
+  }, [name, companyEmail, toast]);
 
   const recordManualCheckin = useCallback(async () => {
     if (!person) return;
-    setError(null);
     setBusy(true);
     try {
       const res = await fetch(`${BASE_PATH}/api/early-checkin/manual`, {
@@ -122,7 +120,7 @@ export default function EarlyCheckinPage() {
       });
       const body = await res.json().catch(() => ({}));
       if (!res.ok) {
-        setError(body.error ?? "Check-in failed.");
+        toast.show(body.error ?? "Check-in failed.", "error");
         setBusy(false);
         return;
       }
@@ -134,6 +132,7 @@ export default function EarlyCheckinPage() {
           method: "manual",
         });
         setStep("already");
+        toast.show(`${body.name} is already checked in.`, "info");
       } else {
         setDoneInfo({
           name: body.name,
@@ -142,19 +141,19 @@ export default function EarlyCheckinPage() {
           method: "manual",
         });
         setStep("done");
+        toast.show(`${body.name} checked in.`, "ok");
       }
     } catch {
-      setError("Network error. Try again.");
+      toast.show("Network error. Try again.", "error");
     } finally {
       setBusy(false);
     }
-  }, [person]);
+  }, [person, toast]);
 
   const handleFaceCapture = useCallback(
     async (blob: Blob) => {
       if (!person) return;
       setCameraOpen(false);
-      setError(null);
       setBusy(true);
       setStep("matching");
       try {
@@ -166,7 +165,7 @@ export default function EarlyCheckinPage() {
         });
         const body = await res.json().catch(() => ({}));
         if (!res.ok) {
-          setError(body.error ?? "Face check-in failed.");
+          toast.show(body.error ?? "Face check-in failed.", "error");
           setStep("choose");
           setBusy(false);
           return;
@@ -180,8 +179,9 @@ export default function EarlyCheckinPage() {
           (c) => c.confident && c.person_id === person.id,
         );
         if (!match) {
-          setError(
+          toast.show(
             "We couldn't verify your face. Please try again or check in manually.",
+            "error",
           );
           setStep("choose");
           setBusy(false);
@@ -198,7 +198,7 @@ export default function EarlyCheckinPage() {
         });
         const confirmBody = await confirmRes.json().catch(() => ({}));
         if (!confirmRes.ok) {
-          setError(confirmBody.error ?? "Could not record check-in.");
+          toast.show(confirmBody.error ?? "Could not record check-in.", "error");
           setStep("choose");
           setBusy(false);
           return;
@@ -211,6 +211,10 @@ export default function EarlyCheckinPage() {
             method: "face",
           });
           setStep("already");
+          toast.show(
+            `${confirmBody.name ?? person.name} is already checked in.`,
+            "info",
+          );
         } else {
           setDoneInfo({
             name: confirmBody.name ?? person.name,
@@ -219,15 +223,16 @@ export default function EarlyCheckinPage() {
             method: "face",
           });
           setStep("done");
+          toast.show(`${confirmBody.name ?? person.name} checked in.`, "ok");
         }
       } catch {
-        setError("Network error. Try again.");
+        toast.show("Network error. Try again.", "error");
         setStep("choose");
       } finally {
         setBusy(false);
       }
     },
-    [person],
+    [person, toast],
   );
 
   const eventOpen = !countdownEnabled || Date.now() >= new Date(countdownTarget).getTime();
@@ -240,8 +245,6 @@ export default function EarlyCheckinPage() {
             Early check-in
           </h1>
         )}
-
-        {error && <div className="notice notice--error">{error}</div>}
 
         {step === "lookup" && !eventOpen && (
           <CountdownTimer
@@ -360,7 +363,7 @@ export default function EarlyCheckinPage() {
               open={cameraOpen}
               onClose={() => setCameraOpen(false)}
               onCapture={handleFaceCapture}
-              onError={(msg) => setError(msg)}
+              onError={(msg) => toast.show(msg, "error")}
             />
           </>
         )}
