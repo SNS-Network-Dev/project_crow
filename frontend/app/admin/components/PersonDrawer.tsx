@@ -163,14 +163,6 @@ export default function PersonDrawer({ person, onPatch, onDelete, onClose }: Pro
       >
         <div className={styles.drawerHeader}>
           <div className={styles.drawerIdentity}>
-            {person.photo_url ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={person.photo_url} alt={person.name} className={styles.drawerAvatar} />
-            ) : (
-              <span className={`${styles.drawerAvatar} ${styles.drawerAvatarPlaceholder}`}>
-                {initials(person.name)}
-              </span>
-            )}
             <div>
               <h2 className={styles.drawerName}>{person.name}</h2>
               <p className={styles.drawerSub}>
