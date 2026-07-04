@@ -5,7 +5,6 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { BASE_PATH } from "@/lib/basePath";
 import { useAdminHome } from "./useAdminHome";
 import useFaceAutoCapture from "./useFaceAutoCapture";
-import { useToast } from "./ToastProvider";
 
 // One unified, responsive check-in surface for BOTH phone (/admin/checkin) and
 // the iPad kiosk (/kiosk). It fills the screen, uses the shared useFaceAutoCapture
@@ -22,7 +21,6 @@ interface Candidate {
 }
 
 export default function CheckinKiosk() {
-  const toast = useToast();
   const [phase, setPhase] = useState<"live" | "matching" | "done" | "already">(
     "live",
   );
@@ -35,6 +33,7 @@ export default function CheckinKiosk() {
     full_company_name: string | null;
     checked_in_at: string;
   } | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const [resetCountdown, setResetCountdown] = useState(10);
   const resetCountdownRef = useRef(10);
   const homeHref = useAdminHome();
@@ -43,6 +42,7 @@ export default function CheckinKiosk() {
 
   const onCapture = useCallback(async (blob: Blob) => {
     setPhase("matching");
+    setError(null);
     try {
       const fd = new FormData();
       fd.append("frame", blob, "frame.jpg");
@@ -52,14 +52,14 @@ export default function CheckinKiosk() {
       });
       if (!res.ok) {
         const b = await res.json().catch(() => ({}));
-        toast.show(b.error ?? "Check-in failed. Try again.", "error");
+        setError(b.error ?? "Check-in failed. Try again.");
         backToLiveRef.current();
         return;
       }
       const b = (await res.json()) as { candidates: Candidate[] };
       const list = b.candidates ?? [];
       if (list.length === 0) {
-        toast.show("No face matched. Please try again.", "error");
+        setError("No face matched. Please try again.");
         backToLiveRef.current();
         return;
       }
@@ -68,10 +68,10 @@ export default function CheckinKiosk() {
         list.reduce((a, c) => (c.score > a.score ? c : a), list[0]);
       onMatchedRef.current(bestMatch);
     } catch {
-      toast.show("Network error. Try again.", "error");
+      setError("Network error. Try again.");
       backToLiveRef.current();
     }
-  }, [toast]);
+  }, []);
 
   const {
     videoRef,
@@ -86,13 +86,16 @@ export default function CheckinKiosk() {
   const backToLive = useCallback(() => {
     setDoneInfo(null);
     setAlreadyInfo(null);
+    setError(null);
     resetCountdownRef.current = 10;
     setResetCountdown(10);
     resetRing();
+    stop();
     setPhase("live");
-  }, [resetRing]);
+  }, [stop, resetRing]);
 
   const onMatched = useCallback(async (candidate: Candidate) => {
+    setError(null);
     try {
       const res = await fetch(`${BASE_PATH}/api/confirm`, {
         method: "POST",
@@ -111,7 +114,7 @@ export default function CheckinKiosk() {
         error?: string;
       };
       if (!res.ok) {
-        toast.show(b.error ?? "Could not record check-in.", "error");
+        setError(b.error ?? "Could not record check-in.");
         return;
       }
       if (b.alreadyCheckedIn) {
@@ -123,7 +126,6 @@ export default function CheckinKiosk() {
         setPhase("already");
         resetCountdownRef.current = 10;
         setResetCountdown(10);
-        toast.show(`${b.name ?? candidate.name} is already checked in.`, "info");
         return;
       }
       setDoneInfo({
@@ -131,11 +133,10 @@ export default function CheckinKiosk() {
         full_company_name: b.full_company_name ?? candidate.full_company_name,
       });
       setPhase("done");
-      toast.show(`${b.name ?? candidate.name} checked in.`, "ok");
     } catch {
-      toast.show("Network error recording check-in.", "error");
+      setError("Network error recording check-in.");
     }
-  }, [toast]);
+  }, []);
 
   useEffect(() => {
     onMatchedRef.current = onMatched;
@@ -144,13 +145,6 @@ export default function CheckinKiosk() {
   useEffect(() => {
     backToLiveRef.current = backToLive;
   }, [backToLive]);
-
-  // Start the camera straight away when the component mounts. On a fresh load
-  // the browser asks for permission once; after permission is granted it just works.
-  useEffect(() => {
-    const id = window.setTimeout(() => start(), 0);
-    return () => window.clearTimeout(id);
-  }, [start]);
 
   // 10-second countdown on the success / already-checked-in screens;
   // auto-returns to live detection so the kiosk is ready for the next guest.
@@ -203,13 +197,17 @@ export default function CheckinKiosk() {
         <span className="kiosk-x" aria-hidden />
       </Link>
 
-      {/* ---- camera starting / permission prompt (no extra tap needed) ---- */}
+      {/* ---- start gate (one tap to grant camera + load detector) ---- */}
       {capturePhase === "idle" && (
         <div className="kiosk-overlay kiosk-overlay--center">
-          <div className="kiosk-card" style={{ textAlign: "center" }}>
-            <div className="spinner" aria-hidden />
-            <h2>Starting camera…</h2>
-            <p className="subtitle">Allow camera access if prompted.</p>
+          <div className="kiosk-card">
+            <h1>Check in</h1>
+            <p className="subtitle">
+              Tap to start, then line up your face in the circle.
+            </p>
+            <button className="btn btn--lg btn--block" onClick={start}>
+              Start check-in
+            </button>
           </div>
         </div>
       )}
@@ -223,6 +221,9 @@ export default function CheckinKiosk() {
             )}
           </div>
           <p className="kiosk-instruction">{ring.hint}</p>
+          {error && (
+            <div className="notice notice--error kiosk-toast">{error}</div>
+          )}
         </div>
       )}
 

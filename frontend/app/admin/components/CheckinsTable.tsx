@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import type { Checkin, Person } from "./useAdminData";
+import { useToast } from "../../components/ToastProvider";
 import styles from "./admin.module.css";
 
 // The page index can land past the last page after filtering/page-size changes.
@@ -31,6 +32,7 @@ export default function CheckinsTable({
   search,
   onDeleteCheckin,
 }: Props) {
+  const toast = useToast();
   const [pageSize, setPageSize] = useState<string>("10");
   const [page, setPage] = useState(1);
   const [deletingId, setDeletingId] = useState<number | null>(null);
@@ -68,10 +70,15 @@ export default function CheckinsTable({
   const paged =
     size === Infinity ? filtered : filtered.slice(start, start + size);
 
-  const handleUndo = async (id: number) => {
-    setDeletingId(id);
-    await onDeleteCheckin(id);
+  const handleUndo = async (c: Checkin) => {
+    setDeletingId(c.id);
+    const ok = await onDeleteCheckin(c.id);
     setDeletingId(null);
+    if (ok) {
+      toast.show(`${c.name} check-in undone.`, "ok");
+    } else {
+      toast.show("Could not undo check-in. Try again.", "error");
+    }
   };
 
   return (
@@ -138,7 +145,7 @@ export default function CheckinsTable({
                     type="button"
                     className="btn btn--danger btn--sm"
                     disabled={deletingId === c.id}
-                    onClick={() => handleUndo(c.id)}
+                    onClick={() => handleUndo(c)}
                   >
                     {deletingId === c.id ? "Undoing…" : "Undo"}
                   </button>

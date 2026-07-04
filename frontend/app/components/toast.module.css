@@ -12,6 +12,7 @@
 }
 
 .toast {
+  position: relative;
   min-width: 220px;
   max-width: 90vw;
   padding: 14px 22px;
@@ -24,6 +25,7 @@
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25);
   animation: toast-in 0.25s ease, toast-out 0.25s ease 2.75s forwards;
   pointer-events: auto;
+  overflow: hidden;
 }
 
 .toast.ok {
@@ -36,6 +38,18 @@
 
 .toast.info {
   background: #1d4ed8;
+}
+
+/* Timer bar that shrinks left-to-right over 3 seconds. */
+.toast::after {
+  content: "";
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  height: 3px;
+  width: 100%;
+  background: rgba(255, 255, 255, 0.5);
+  animation: toast-timer 3s linear forwards;
 }
 
 @keyframes toast-in {
@@ -60,8 +74,20 @@
   }
 }
 
+@keyframes toast-timer {
+  from {
+    width: 100%;
+  }
+  to {
+    width: 0%;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .toast {
     animation: none;
+  }
+  .toast::after {
+    display: none;
   }
 }
