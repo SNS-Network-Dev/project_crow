@@ -76,7 +76,7 @@ export default function SettingsPanel() {
       message.includes("Could not"));
 
   return (
-    <div className="panel" style={{ maxWidth: 560 }}>
+    <div className="panel">
       <h2 style={{ marginBottom: 22 }}>Event settings</h2>
 
       <div className="register-field" style={{ marginBottom: 16 }}>
@@ -123,9 +123,9 @@ export default function SettingsPanel() {
         }}
       >
         <div>
-          <strong>Early check-in countdown</strong>
+          <strong>Self check-in countdown</strong>
           <p className="subtitle" style={{ margin: "4px 0 0" }}>
-            Show a countdown on /early-checkin until one hour before the event.
+            Show a countdown on the self check-in page until one hour before the event.
           </p>
         </div>
         <button
@@ -150,7 +150,7 @@ export default function SettingsPanel() {
 
       <div style={{ marginTop: 16 }}>
         <p className="subtitle">
-          Early check-in opens at:{" "}
+          Self check-in opens at:{" "}
           <strong>
             {new Date(settings.earlyCheckinTargetIso).toLocaleString("en-MY", {
               dateStyle: "medium",

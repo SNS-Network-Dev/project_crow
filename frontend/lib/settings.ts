@@ -8,12 +8,24 @@ const DEFAULTS: AppSettings = {
   eventName: "Project Crow Event",
   eventStartIso: "2025-07-17T18:00:00+08:00",
   earlyCheckinCountdownEnabled: false,
+  // Photo-booth generation controls (see Booth control page). Prompts blank =
+  // baremetal house default (no override sent). Variants clamped by the API too.
+  avatarKelvinVariants: 4,
+  avatarGroupVariants: 3,
+  avatarPrompt: "",
+  avatarPairPrompt: "",
+  avatarGroupPrompt: "",
 };
 
 export interface AppSettings {
   eventName: string;
   eventStartIso: string;
   earlyCheckinCountdownEnabled: boolean;
+  avatarKelvinVariants: number; // /kelvin poses to choose from, 1–4
+  avatarGroupVariants: number; // /group takes, 1–6
+  avatarPrompt: string; // /kelvin figurine override ("" = house default)
+  avatarPairPrompt: string; // /kelvin guest+Kelvin combine override
+  avatarGroupPrompt: string; // /group per-person override
 }
 
 // Derived: early check-in opens one hour before the event starts.

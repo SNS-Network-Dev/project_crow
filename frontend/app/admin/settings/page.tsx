@@ -6,10 +6,12 @@ export default function SettingsPage() {
     <main className="wrap wrap--wide">
       <h1 style={{ marginBottom: 6 }}>Settings</h1>
       <p className="subtitle" style={{ marginBottom: 24 }}>
-        Manage event details, early check-in, and admin users.
+        Manage event details, self check-in, and admin users.
       </p>
-      <SettingsPanel />
-      <AdminUsersPanel />
+      <div className="admin-cols">
+        <SettingsPanel />
+        <AdminUsersPanel />
+      </div>
     </main>
   );
 }

@@ -7,6 +7,7 @@ import { loadTemplate } from "@/lib/avatarTemplate";
 import { composePoster } from "@/lib/avatarComposite";
 import { savePoster } from "@/lib/posters";
 import { appendSet } from "@/lib/gallery";
+import { loadSettings } from "@/lib/settings";
 import { config } from "@/lib/config";
 import { BASE_PATH } from "@/lib/basePath";
 
@@ -16,7 +17,6 @@ export const dynamic = "force-dynamic";
 // AVATAR_FAKE skips the GPU call and uses the placeholder pair (data/samples/figure.png)
 // so the capture -> composite -> poster(s) flow is testable without the GPU. Set to 0 live.
 const FAKE = ["1", "true", "yes"].includes((process.env.AVATAR_FAKE ?? "").toLowerCase());
-const TRUTHY = new Set(["1", "true", "yes", "on"]);
 
 export async function POST(request: Request) {
   let form: FormData;
@@ -33,8 +33,11 @@ export async function POST(request: Request) {
 
   const templateName = (form.get("template") ?? "default").toString();
   const mode = (form.get("mode") ?? "kelvin").toString() === "group" ? "group" : "kelvin";
-  const withKelvin = TRUTHY.has((form.get("kelvin") ?? "").toString().toLowerCase());
-  const variants = Math.min(4, Math.max(1, parseInt((form.get("variants") ?? "1").toString(), 10) || 1));
+
+  // Variants + prompt overrides are operator-controlled (Booth control page →
+  // settings.json), read fresh per request so changes apply on the next capture
+  // with no restart. The booth no longer dictates variants.
+  const settings = await loadSettings();
 
   // Per-request customizable copy: any field named `text:<id>` overrides that template text.
   const textOverrides: Record<string, string> = {};
@@ -42,21 +45,28 @@ export async function POST(request: Request) {
     if (k.startsWith("text:") && typeof v === "string") textOverrides[k.slice(5)] = v;
   }
 
-  // 1) Generate figure image(s) — one per pose for the kelvin chooser, one for group.
+  // 1) Generate figure image(s) — one per pose for the kelvin chooser, several for group.
   let results: AvatarImage[];
   try {
     if (FAKE) {
       const ph = await readFile(resolve(config.avatarTemplateDir, "..", "samples", "figure.png"));
-      const n = mode === "group" ? 3 : variants;
+      const n = mode === "group" ? settings.avatarGroupVariants : settings.avatarKelvinVariants;
       results = Array.from({ length: n }, (_, i) => ({
         image: ph,
         variant: mode === "group" ? "group" : i === 0 ? "arm-around" : "pose-follow",
         seed: 1000 + i,
       }));
     } else if (mode === "group") {
-      results = await generateGroup(photo, { kelvin: withKelvin });
+      results = await generateGroup(photo, {
+        variants: settings.avatarGroupVariants,
+        prompt: settings.avatarGroupPrompt || undefined,
+      });
     } else {
-      results = await generateKelvin(photo, { variants });
+      results = await generateKelvin(photo, {
+        variants: settings.avatarKelvinVariants,
+        prompt: settings.avatarPrompt || undefined,
+        pairPrompt: settings.avatarPairPrompt || undefined,
+      });
     }
   } catch (e) {
     if (e instanceof BMAvatarError) {

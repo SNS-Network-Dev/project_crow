@@ -37,7 +37,7 @@ export default function CountdownTimer({
   return (
     <div className="register-countdown">
       <h2>
-        Early check-in for {eventName} opens in
+        Self check-in for {eventName} opens in
       </h2>
       <div className="register-countdown__grid">
         <div className="register-countdown__unit">

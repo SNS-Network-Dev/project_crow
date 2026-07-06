@@ -68,22 +68,29 @@ curl -sk -X POST https://103.47.130.195/crow-api/api/avatar/group -F photo=@grou
   `avatar_model_ready:true`. Requests before that return `503`.
 
 ### Live queue view (admin)
-`GET /status` → what's running now, who's queued (ordered, with positions + ETA), capacity,
-and rolling-average durations. Use it to show the booth a live wait estimate.
+`GET /status` → a **global** view across all parallel workers: which are busy, what's running,
+what's queued (with positions + ETA), and total capacity. Any node answers the same aggregated
+view (it's behind a load balancer). Use it to show the booth a live wait estimate.
 ```json
 {
-  "running": { "id": "4", "endpoint": "kelvin", "elapsed_s": 7.0 },
-  "queued":  [ { "id": "5", "endpoint": "kelvin", "pos": 1, "eta_s": 8 },
-               { "id": "6", "endpoint": "group",  "pos": 2, "eta_s": 24 } ],
-  "capacity": 3, "free_slots": 0,
-  "avg_ms": { "kelvin": 15286, "group": 42466 },
-  "ready": true
+  "workers": [
+    { "instance": "A", "ready": true, "busy": true,  "queued": 1, "free_slots": 1 },
+    { "instance": "B", "ready": true, "busy": false, "queued": 0, "free_slots": 3 }
+  ],
+  "running": [ { "id": "1", "endpoint": "kelvin", "elapsed_s": 8.0, "instance": "A" } ],
+  "queued":  [ { "id": "2", "endpoint": "kelvin", "pos": 1, "eta_s": 20, "instance": "A" } ],
+  "parallel_slots": 2, "busy_workers": 1,
+  "total_capacity": 6, "total_free_slots": 5
 }
 ```
-- `eta_s` = estimated seconds until that queued job **starts** (running-job remainder + all
-  jobs ahead). `capacity` is the total in-flight limit; when `free_slots:0` new requests get
-  `503`. Generation is still **one-at-a-time** (serial) — `/status` is visibility, not
-  parallelism (parallelism is a planned phase 2).
+- **`parallel_slots`** = how many requests can generate **at the same time** (one per worker).
+- **`busy_workers`** = how many are generating right now.
+- **`total_capacity`** = in-flight + queued limit across all workers; at `total_free_slots:0`
+  new requests get `503` (retry).
+- `eta_s` = seconds until that queued job **starts** (its worker's running-job remainder + jobs
+  ahead **on that worker**).
+- Also `GET /status_local` → a single worker's own queue (used internally for aggregation; you
+  won't normally need it).
 
 ---
 
@@ -189,8 +196,13 @@ Turn this exact person into a premium 3D collectible caricature figurine with a 
 Pose reading uses the local Gemma-4 vision model (`:8085`); if it is down the figures fall
 back to a neutral standing pose (generation never fails).
 
-Keep the bridge's per-request timeout at **120 s** (unchanged). Generation is **serialized**
-on the GPU (one at a time); if more than a few requests queue, extras get `503` — retry.
+Keep the bridge's per-request timeout at **120 s** (unchanged).
+
+**Concurrency (updated):** the service now runs **2 parallel workers** — **2 requests generate
+at the same time**, and up to **6** total in flight (running + queued) before extras get `503`
+(retry). You can safely fire multiple requests concurrently; they no longer strictly queue
+behind one GPU. Poll `/status` for the live global view (`parallel_slots`, `busy_workers`,
+`total_free_slots`).
 
 ---
 

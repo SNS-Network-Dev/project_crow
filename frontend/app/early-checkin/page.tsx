@@ -242,7 +242,7 @@ export default function EarlyCheckinPage() {
       <div className="panel register-card">
         {step === "lookup" && (
           <h1 className="register-title register-title--in-card">
-            Early check-in
+            Self check-in
           </h1>
         )}
 

@@ -47,6 +47,22 @@ export async function POST(request: Request) {
     patch.earlyCheckinCountdownEnabled = body.earlyCheckinCountdownEnabled;
   }
 
+  // Photo-booth controls. Variants clamped to the API's accepted ranges; prompts
+  // trimmed + capped (blank clears the override → baremetal house default).
+  const clampInt = (v: unknown, lo: number, hi: number) =>
+    Math.min(hi, Math.max(lo, Math.round(Number(v)) || lo));
+  if (body.avatarKelvinVariants != null) {
+    patch.avatarKelvinVariants = clampInt(body.avatarKelvinVariants, 1, 4);
+  }
+  if (body.avatarGroupVariants != null) {
+    patch.avatarGroupVariants = clampInt(body.avatarGroupVariants, 1, 6);
+  }
+  for (const key of ["avatarPrompt", "avatarPairPrompt", "avatarGroupPrompt"] as const) {
+    if (typeof body[key] === "string") {
+      patch[key] = (body[key] as string).trim().slice(0, 2000);
+    }
+  }
+
   try {
     const settings = await saveSettings(patch);
     return toResponse(settings);

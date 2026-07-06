@@ -127,13 +127,15 @@ async function parseAvatarResponse(res: Response, path: string): Promise<AvatarI
  */
 export async function generateKelvin(
   photo: Blob,
-  opts?: { variants?: number; seed?: number; timeoutMs?: number },
+  opts?: { variants?: number; seed?: number; prompt?: string; pairPrompt?: string; timeoutMs?: number },
 ): Promise<AvatarImage[]> {
   const fd = new FormData();
   fd.append("photo", photo, "photo.jpg");
   if (opts?.seed != null) fd.append("seed", String(opts.seed));
   const variants = Math.min(4, Math.max(1, opts?.variants ?? 1));
   if (variants > 1) fd.append("variants", String(variants));
+  if (opts?.prompt) fd.append("prompt", opts.prompt);
+  if (opts?.pairPrompt) fd.append("pair_prompt", opts.pairPrompt);
 
   const res = await bm("/avatar/kelvin", {
     method: "POST",
@@ -144,17 +146,19 @@ export async function generateKelvin(
 }
 
 /**
- * `/avatar/group` — a group photo (1–4 people) → side-by-side figurines. Set
- * `kelvin` to append the fixed Mr Kelvin figure on the right.
+ * `/avatar/group` — a group photo (1–4 people) → side-by-side figurines, each
+ * keeping their own pose. Returns `variants` figurine-only takes (default 3, max 6);
+ * per AVATAR_API_HANDOFF.md `/group` NEVER includes Mr Kelvin (he lives on /kelvin).
  */
 export async function generateGroup(
   photo: Blob,
-  opts?: { kelvin?: boolean; seed?: number; timeoutMs?: number },
+  opts?: { variants?: number; seed?: number; prompt?: string; timeoutMs?: number },
 ): Promise<AvatarImage[]> {
   const fd = new FormData();
   fd.append("photo", photo, "photo.jpg");
   if (opts?.seed != null) fd.append("seed", String(opts.seed));
-  if (opts?.kelvin) fd.append("kelvin", "1");
+  if (opts?.variants != null) fd.append("variants", String(Math.min(6, Math.max(1, opts.variants))));
+  if (opts?.prompt) fd.append("prompt", opts.prompt);
 
   const res = await bm("/avatar/group", {
     method: "POST",
@@ -162,6 +166,27 @@ export async function generateGroup(
     signal: AbortSignal.timeout(opts?.timeoutMs ?? 120_000),
   });
   return parseAvatarResponse(res, "/avatar/group");
+}
+
+/**
+ * `/avatar/status` — global multi-worker queue view (see AVATAR_API_HANDOFF.md).
+ * Used to show the booth a live wait estimate. Short timeout: it's just a UI hint,
+ * never worth blocking a capture on.
+ */
+export interface BMAvatarStatus {
+  workers: { instance: string; ready: boolean; busy: boolean; queued: number; free_slots: number }[];
+  running: { id: string; endpoint: string; elapsed_s: number; instance: string }[];
+  queued: { id: string; endpoint: string; pos: number; eta_s: number; instance: string }[];
+  parallel_slots: number;
+  busy_workers: number;
+  total_capacity: number;
+  total_free_slots: number;
+}
+
+export async function avatarStatus(): Promise<BMAvatarStatus> {
+  const res = await bm("/avatar/status", { method: "GET", signal: AbortSignal.timeout(5000) });
+  if (!res.ok) throw new Error(`baremetal /avatar/status ${res.status}`);
+  return res.json();
 }
 
 export async function matrixAdd(personId: number, embedding: Buffer): Promise<void> {

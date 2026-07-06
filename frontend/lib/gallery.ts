@@ -13,7 +13,7 @@ import { config } from "./config";
 
 export interface GalleryPosterRef {
   id: string; // poster id -> <POSTERS_DIR>/<id>.png
-  variant: string | null; // "arm-around" | "pose-follow" | "group" | "group+kelvin" | null
+  variant: string | null; // "arm-around" | "pose-follow" | "group" | null
   seed: number | null;
 }
 

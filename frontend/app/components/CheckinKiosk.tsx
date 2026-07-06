@@ -79,8 +79,7 @@ export default function CheckinKiosk() {
     camError,
     phase: capturePhase,
     start,
-    stop,
-    resetRing,
+    resume,
   } = useFaceAutoCapture(onCapture);
 
   const backToLive = useCallback(() => {
@@ -89,10 +88,10 @@ export default function CheckinKiosk() {
     setError(null);
     resetCountdownRef.current = 10;
     setResetCountdown(10);
-    resetRing();
-    stop();
+    // Re-arm the live scan on the same camera — no "Start check-in" gate again.
+    resume();
     setPhase("live");
-  }, [stop, resetRing]);
+  }, [resume]);
 
   const onMatched = useCallback(async (candidate: Candidate) => {
     setError(null);

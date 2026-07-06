@@ -9,7 +9,12 @@ import Sidebar from "./Sidebar";
 // camera/stage can use the whole viewport; they're still gated by proxy.ts,
 // just without the rail. Public surfaces (/register, /login, /early-checkin,
 // and the / redirect) are also bare.
-const SIDEBAR_ADMIN_PREFIXES = ["/admin/list", "/admin/settings", "/admin/avatar/gallery"];
+const SIDEBAR_ADMIN_PREFIXES = [
+  "/admin/list",
+  "/admin/settings",
+  "/admin/booth",
+  "/admin/avatar/gallery",
+];
 
 function isAdminRoute(pathname: string | null): boolean {
   if (!pathname) return false;

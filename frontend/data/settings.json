@@ -1,5 +1,10 @@
 {
   "eventName": "Mr Kelvin's Birthday",
-  "eventStartIso": "2026-08-01T18:00:00+08:00",
-  "earlyCheckinCountdownEnabled": true
+  "eventStartIso": "2026-07-17T18:00:00+08:00",
+  "earlyCheckinCountdownEnabled": true,
+  "avatarKelvinVariants": 2,
+  "avatarGroupVariants": 2,
+  "avatarPrompt": "",
+  "avatarPairPrompt": "",
+  "avatarGroupPrompt": ""
 }

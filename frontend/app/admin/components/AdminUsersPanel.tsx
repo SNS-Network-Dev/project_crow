@@ -139,7 +139,7 @@ export default function AdminUsersPanel() {
       message.includes("must be"));
 
   return (
-    <div className="panel" style={{ maxWidth: 560, marginTop: 20 }}>
+    <div className="panel">
       <h2 style={{ marginBottom: 22 }}>Admin users</h2>
 
       <div className="register-field" style={{ marginBottom: 16 }}>

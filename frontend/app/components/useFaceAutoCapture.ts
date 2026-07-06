@@ -122,6 +122,22 @@ export default function useFaceAutoCapture(onCapture: (blob: Blob) => void) {
     }
   }, []);
 
+  // Re-arm detection WITHOUT tearing down the camera/detector — used to return
+  // to live scanning after a check-in so the kiosk flows straight to the next
+  // face with no "tap to start" gate. Falls back to a full start() only if the
+  // camera/detector are gone (e.g. after an error teardown).
+  const resume = useCallback(() => {
+    capturingRef.current = false;
+    holdStartRef.current = 0;
+    statusKeyRef.current = "";
+    setRing({ state: "search", hint: "Position your face in the circle", count: 0 });
+    if (!streamRef.current || !detectorRef.current) {
+      void start();
+      return;
+    }
+    setPhase("live");
+  }, [start]);
+
   const doCapture = useCallback(() => {
     const video = videoRef.current;
     if (capturingRef.current || !video || !video.videoWidth) return;
@@ -253,6 +269,7 @@ export default function useFaceAutoCapture(onCapture: (blob: Blob) => void) {
     phase,
     start,
     stop,
+    resume,
     resetRing,
   };
 }

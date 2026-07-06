@@ -16,7 +16,16 @@ type Mode = "kelvin" | "group";
 type Phase = "live" | "generating" | "done";
 type CamError = "insecure" | "denied" | "notfound" | "other" | null;
 
-const KELVIN_VARIANTS = 4; // 1 arm-around + 3 pose-follow, chosen at the gallery
+// Trimmed /api/avatar/status payload (bridge → booth) for the live wait chip.
+interface GpuStatus {
+  ok: boolean;
+  parallelSlots: number;
+  busyWorkers: number;
+  freeSlots: number;
+  waiting: number;
+  etaS: number;
+}
+
 const RESET_MS = 6000; // auto-return to live after a successful send
 
 export default function AvatarStudio() {
@@ -30,6 +39,7 @@ export default function AvatarStudio() {
   const [camError, setCamError] = useState<CamError>(null);
   const [error, setError] = useState<string | null>(null);
   const [resetIn, setResetIn] = useState(0);
+  const [gpu, setGpu] = useState<GpuStatus | null>(null);
   const homeHref = useAdminHome();
 
   // Low-level: (re)open the stream on the requested camera. Releases the current
@@ -105,6 +115,27 @@ export default function AvatarStudio() {
     setPhase("live");
   }, []);
 
+  // Live GPU wait estimate — poll only while the booth is idle on the camera.
+  useEffect(() => {
+    if (!(started && phase === "live")) return;
+    let cancelled = false;
+    const load = async () => {
+      try {
+        const res = await fetch(`${BASE_PATH}/api/avatar/status`, { cache: "no-store" });
+        const b = (await res.json()) as GpuStatus;
+        if (!cancelled) setGpu(b?.ok ? b : null);
+      } catch {
+        if (!cancelled) setGpu(null);
+      }
+    };
+    load();
+    const id = window.setInterval(load, 4000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(id);
+    };
+  }, [started, phase]);
+
   // Auto-reset countdown on the success screen.
   useEffect(() => {
     if (phase !== "done") return;
@@ -129,7 +160,6 @@ export default function AvatarStudio() {
         const fd = new FormData();
         fd.append("photo", photo, "photo.jpg");
         fd.append("mode", mode);
-        if (mode === "kelvin") fd.append("variants", String(KELVIN_VARIANTS));
 
         const res = await fetch(`${BASE_PATH}/api/avatar`, { method: "POST", body: fd });
         const body = await res.json().catch(() => ({}));
@@ -271,6 +301,22 @@ export default function AvatarStudio() {
 
           <div className="kiosk-actions">
             {error && <div className="notice notice--error kiosk-toast">{error}</div>}
+            {gpu &&
+              (() => {
+                let tone = "ready";
+                let label = "GPU ready · no wait";
+                if (gpu.freeSlots === 0) {
+                  tone = "busy";
+                  label = "GPU full — capture may need a retry";
+                } else if (gpu.waiting > 0) {
+                  tone = "wait";
+                  label = `GPU busy · ${gpu.waiting} ahead (~${gpu.etaS}s)`;
+                } else if (gpu.busyWorkers > 0) {
+                  tone = "wait";
+                  label = `GPU: ${gpu.busyWorkers}/${gpu.parallelSlots} busy · ready`;
+                }
+                return <div className={`gpu-chip gpu-chip--${tone}`}>{label}</div>;
+              })()}
             <button className="btn btn--lg" onClick={capture}>
               Capture
             </button>
