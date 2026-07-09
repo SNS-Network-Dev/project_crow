@@ -430,6 +430,8 @@ th {
 
 .tab-bar {
   display: flex;
+  flex-wrap: wrap;
+  align-items: center;
   gap: 6px;
   margin-bottom: 12px;
 }
@@ -460,8 +462,27 @@ th {
 }
 
 /* Search input that shares the tab row (sits right-aligned with the tabs). */
-.tabSearch {
+/* "Add guest" sits just left of the search box; margin-left:auto pushes the
+   pair to the right of the tabs. Matches the search box's height/radius. */
+.tabActionBtn {
   margin-left: auto;
+  align-self: center;
+  padding: 8px 16px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  white-space: nowrap;
+  color: #fff;
+  background: var(--accent);
+  border: 1px solid var(--accent);
+  border-radius: 10px;
+  cursor: pointer;
+  transition: filter 0.15s;
+}
+.tabActionBtn:hover {
+  filter: brightness(0.94);
+}
+
+.tabSearch {
   align-self: center;
   flex: 0 1 280px;
   min-width: 180px;
@@ -480,6 +501,9 @@ th {
 }
 
 @media (max-width: 720px) {
+  .tabActionBtn {
+    margin-left: auto;
+  }
   .tabSearch {
     flex-basis: 100%;
     margin: 6px 0 0;
@@ -488,9 +512,16 @@ th {
 
 /* ---- admin table ---- */
 
+/* Wide + tall table. Bound the height to the viewport and scroll INSIDE the
+   wrapper in both directions: otherwise the horizontal scrollbar sits at the
+   bottom of a very tall element (below the fold) and is unreachable — which
+   looks like "cut off, can't scroll", especially when zoomed in. The sticky
+   thead keeps column headers visible while scrolling vertically. */
 .admin-table-wrapper {
-  overflow-x: auto;
+  overflow: auto;
   -webkit-overflow-scrolling: touch;
+  max-height: calc(100dvh - 230px);
+  min-height: 300px;
 }
 
 .admin-table {
@@ -651,9 +682,9 @@ th {
      so the global light palette would make overlay buttons unreadable. Override
      the tokens locally for everything inside the stage. */
   --bg: #0b0f14;
-  --panel: #141b24;
+  --panel: rgba(20, 27, 36, 0.82);
   --panel-2: #1c2632;
-  --border: #263241;
+  --border: rgba(38, 50, 65, 0.7);
   --text: #eaf0f6;
   --muted: #9fb0c0;
   --accent: #3aa0ff;
@@ -661,6 +692,10 @@ th {
   --danger: #e0526a;
   position: fixed;
   inset: 0;
+  /* Above page content (e.g. the register/checkin card at z-index 1) when used
+     as the fullscreen FaceCapture modal; below toasts (z-index 100). Harmless on
+     the standalone kiosk pages where the stage is the root element. */
+  z-index: 90;
   width: 100vw;
   height: 100vh;
   height: 100dvh;
@@ -673,6 +708,81 @@ th {
   align-items: center;
   justify-content: center;
   background: var(--bg);
+}
+
+/* Shared event background image for admin check-in surfaces. The QR/face kiosks
+   get a subtle backdrop while keeping overlays readable. */
+.kiosk-stage--bg {
+  background: var(--kiosk-bg-url, #000) center / cover no-repeat;
+}
+.kiosk-stage--checkin {
+  /* Face check-in shows the camera feed on top of the backdrop, but dim it so
+     the event background is still subtly visible behind the guest. */
+}
+.kiosk-stage--checkin .kiosk-bg-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  background: var(--kiosk-bg-url, #000) center / cover no-repeat;
+  opacity: 0.35;
+  pointer-events: none;
+}
+.kiosk-stage--checkin .kiosk-video {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  object-fit: cover;
+  /* Let the camera be slightly translucent so the event backdrop stays subtly
+     visible behind the guest (the alignment ring still spotlights the face). */
+  opacity: 0.78;
+  background: transparent;
+  transform: scaleX(-1);
+}
+/* While the camera is off (idle start gate), hide the video element so the
+   event backdrop shows through instead of the video's solid black background. */
+.kiosk-stage--checkin .kiosk-video--idle {
+  opacity: 0;
+  background: transparent;
+}
+/* Overlays sit above the camera feed (z-index 1) but BELOW the home (X) and
+   fullscreen controls so those stay clickable throughout the check-in flow. */
+.kiosk-stage--checkin .kiosk-overlay {
+  z-index: 2;
+}
+.kiosk-stage--bg .kiosk-overlay--center,
+.kiosk-stage--bg .kiosk-card {
+  --panel: rgba(10, 12, 15, 0.7);
+  --border: rgba(255, 255, 255, 0.14);
+}
+.kiosk-stage--bg .kiosk-overlay--center {
+  background: rgba(0, 0, 0, 0.35);
+}
+.kiosk-stage--bg .kiosk-card {
+  backdrop-filter: blur(10px);
+}
+
+.kiosk-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 22px;
+  text-align: center;
+  padding: calc(env(safe-area-inset-top) + 16px) 16px
+    calc(env(safe-area-inset-bottom) + 16px);
+}
+.kiosk-overlay--center {
+  background: rgba(0, 0, 0, 0.45);
+}
+
+/* QR check-in card sits near the bottom so the event artwork stays visible,
+   but lifted up a bit so it's not too close to the screen edge. */
+.kiosk-overlay--bottom {
+  justify-content: flex-end;
+  padding-bottom: calc(env(safe-area-inset-bottom) + 16vh);
 }
 
 .kiosk-video {
@@ -702,23 +812,6 @@ th {
   background: rgba(0, 0, 0, 0.45);
   border-radius: 50%;
   backdrop-filter: blur(4px);
-}
-
-.kiosk-overlay {
-  position: absolute;
-  inset: 0;
-  z-index: 3;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 22px;
-  text-align: center;
-  padding: calc(env(safe-area-inset-top) + 16px) 16px
-    calc(env(safe-area-inset-bottom) + 16px);
-}
-.kiosk-overlay--center {
-  background: rgba(0, 0, 0, 0.45);
 }
 
 /* Face-alignment ring. The big spread shadow dims everything outside the oval,
@@ -834,13 +927,170 @@ th {
   transform: rotate(-45deg) translate(2px, -3px);
 }
 
-/* ===== Register page ===== */
+/* No-match / failure modal: red circle with an X. */
+.kiosk-card--err {
+  border-color: var(--danger);
+  text-align: center;
+}
+.kiosk-cross {
+  width: clamp(64px, 16vmin, 108px);
+  height: clamp(64px, 16vmin, 108px);
+  border-radius: 50%;
+  background: var(--danger);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 12px;
+}
+.kiosk-cross-mark {
+  position: relative;
+  width: clamp(30px, 7.5vmin, 52px);
+  height: 6px;
+  background: #fff;
+  border-radius: 3px;
+  transform: rotate(45deg);
+}
+.kiosk-cross-mark::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: #fff;
+  border-radius: 3px;
+  transform: rotate(90deg);
+}
+
+/* ===== Register + self check-in pages (qr-checkin dark-glass look) ===== */
+
+/* Full-viewport stage that centers the card over the event backdrop. Uses
+   min-height (not height) so tall content (register stepper/photo review) grows
+   and scrolls instead of being clipped. Sets a local dark theme so the card and
+   form controls read like the qr-checkin kiosk; admin reuses register-* on the
+   light theme, so every dark override below is scoped under .cx-stage. */
+.cx-stage {
+  --bg: #0b0f14;
+  --panel: rgba(20, 27, 36, 0.82);
+  --panel-2: #1c2632;
+  --border: rgba(255, 255, 255, 0.14);
+  --text: #eaf0f6;
+  --muted: #9fb0c0;
+  --accent: #5ab0ff;
+  --accent-strong: #1f8a3b;
+  color: var(--text);
+  position: relative;
+  z-index: 0;
+  min-height: 100dvh;
+  display: grid;
+  place-items: center;
+  padding: max(20px, env(safe-area-inset-top)) 16px
+    calc(20px + env(safe-area-inset-bottom));
+}
+
+/* Push the check-in card low on the screen (mirrors qr-checkin's bottom bias). */
+.cx-stage--bottom {
+  align-items: end;
+  padding-bottom: calc(env(safe-area-inset-bottom) + 3vh);
+}
+
+/* /checkin only: lifted up a bit so it's not right at the screen edge.
+   (/register keeps the original 3vh bottom bias.) */
+.cx-stage--raised {
+  padding-bottom: calc(env(safe-area-inset-bottom) + 12vh);
+}
+
+/* Dark frosted glass card, matching the qr-checkin kiosk card. */
 .register-card {
-  border: none;
-  box-shadow: 0 10px 40px rgba(22, 25, 29, 0.08);
+  background: rgba(14, 18, 26, 0.72);
+  backdrop-filter: blur(16px) saturate(1.1);
+  -webkit-backdrop-filter: blur(16px) saturate(1.1);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.5);
   padding: 32px;
   max-width: 480px;
-  margin: 0 auto 16px;
+  width: 100%;
+  margin: 0;
+  position: relative;
+  z-index: 1;
+}
+
+/* Nearly-solid variant (used on /register) so the backdrop is barely visible. */
+.cx-stage--opaque .register-card {
+  background: rgba(12, 16, 23, 0.95);
+  backdrop-filter: blur(22px) saturate(1.1);
+  -webkit-backdrop-filter: blur(22px) saturate(1.1);
+}
+
+/* Dark overrides for the light-styled form controls (scoped to the stage). */
+.cx-stage .register-field input {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: var(--border);
+  color: var(--text);
+  box-shadow: none;
+}
+.cx-stage .register-field input::placeholder {
+  color: rgba(234, 240, 246, 0.4);
+}
+.cx-stage .register-btn--ghost {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: var(--border);
+  color: var(--text);
+}
+.cx-stage .register-btn--ghost:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.14);
+  box-shadow: none;
+}
+.cx-stage .register-privacy-notice {
+  background: rgba(90, 176, 255, 0.12);
+  border-color: rgba(90, 176, 255, 0.28);
+  color: #cfe3f5;
+}
+.cx-stage .register-method-option {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: var(--border);
+}
+.cx-stage .register-method-icon {
+  background: rgba(255, 255, 255, 0.1);
+  box-shadow: none;
+}
+
+/* Check-in type + time on the self check-in success screen (for staff). */
+.register-checkin-meta {
+  margin: 6px 0 18px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+  text-align: left;
+}
+.register-checkin-meta__row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+  padding: 12px 16px;
+}
+.register-checkin-meta__row + .register-checkin-meta__row {
+  border-top: 1px solid var(--border);
+}
+.register-checkin-meta__row span {
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+.register-checkin-meta__row strong {
+  font-weight: 700;
+  font-size: 0.98rem;
+  text-align: right;
+}
+
+/* "Screenshot this and show staff" callout on the self check-in success screen. */
+.register-screenshot-note {
+  margin: 2px 0 0;
+  padding: 14px 16px;
+  border-radius: 12px;
+  background: rgba(90, 176, 255, 0.14);
+  border: 1px solid rgba(90, 176, 255, 0.3);
+  color: #dbe9f7;
+  font-size: 0.95rem;
+  line-height: 1.5;
+  text-align: center;
 }
 .register-title {
   text-align: center;
@@ -1355,9 +1605,9 @@ th {
   align-items: center;
   gap: 10px;
   min-width: 0;
+  flex: 1 1 auto;
   color: var(--text);
   font-weight: 700;
-  white-space: nowrap;
 }
 
 .sidebarBrandMark {
@@ -1374,9 +1624,17 @@ th {
   font-weight: 800;
   letter-spacing: 0.02em;
 }
+.sidebarBrandMark img {
+  width: 74%;
+  height: 74%;
+  object-fit: contain;
+}
 
 .sidebarBrandName {
-  font-size: 1rem;
+  font-size: 0.95rem;
+  line-height: 1.15;
+  min-width: 0;
+  overflow: hidden;
 }
 
 .sidebarToggle {
@@ -1445,6 +1703,13 @@ th {
   color: #0d9488;
 }
 
+/* Temporarily unavailable items — visible but not clickable. */
+.navItem--disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
 .navIcon {
   flex: 0 0 16px;
   width: 16px;
@@ -1504,6 +1769,7 @@ th {
   border-bottom: 1px solid var(--border);
   font-size: 0.75rem;
   color: var(--muted);
+  overflow-wrap: anywhere;
 }
 
 .accountItem {
@@ -1567,6 +1833,12 @@ th {
   justify-content: center;
   font-size: 0.8rem;
   font-weight: 700;
+  overflow: hidden;
+}
+.accountAvatar img {
+  width: 72%;
+  height: 72%;
+  object-fit: contain;
 }
 
 .accountMeta {
@@ -2302,6 +2574,504 @@ th {
   font-weight: 700;
 }
 
+/* Check-in method badge (admin check-ins table) */
+.method-badge {
+  display: inline-block;
+  padding: 2px 9px;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  line-height: 1.5;
+  border: 1px solid transparent;
+  white-space: nowrap;
+}
+.method-badge--face {
+  color: #0f766e;
+  background: #ccfbf1;
+  border-color: #99f6e4;
+}
+.method-badge--qr {
+  color: #3730a3;
+  background: #e0e7ff;
+  border-color: #c7d2fe;
+}
+.method-badge--self {
+  color: #9d174d;
+  background: #fce7f3;
+  border-color: #fbcfe8;
+}
+.method-badge--manual {
+  color: #475569;
+  background: #f1f5f9;
+  border-color: #e2e8f0;
+}
+
+/* Excel import preview modal */
+.import-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 120;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: rgba(15, 23, 42, 0.55);
+  backdrop-filter: blur(4px);
+}
+.import-modal {
+  width: min(1060px, 96vw);
+  max-height: 92vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--panel, #fff);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.28);
+  overflow: hidden;
+}
+.import-modal-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 18px 20px 12px;
+}
+.import-modal-head h2 {
+  margin: 0;
+  font-size: 1.15rem;
+}
+.import-modal-file {
+  margin: 4px 0 0;
+  font-size: 0.8rem;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+.import-modal-x {
+  flex: 0 0 auto;
+  width: 32px;
+  height: 32px;
+  border: none;
+  background: transparent;
+  border-radius: 8px;
+  font-size: 1.4rem;
+  line-height: 1;
+  color: var(--muted);
+  cursor: pointer;
+}
+.import-modal-x:hover {
+  background: var(--panel-2);
+}
+.import-modal-loading {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 28px 20px;
+  color: var(--muted);
+}
+.import-stats {
+  display: flex;
+  gap: 10px;
+  padding: 4px 20px 14px;
+}
+.import-stat {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 12px 8px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--panel-2);
+}
+.import-stat-num {
+  font-size: 1.5rem;
+  font-weight: 700;
+}
+.import-stat-label {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+}
+.import-stat--add {
+  border-color: #99f6e4;
+  background: #ccfbf1;
+  color: #0f766e;
+}
+.import-stat--add .import-stat-label {
+  color: #0f766e;
+}
+.import-stat--dup {
+  border-color: #fde68a;
+  background: #fef3c7;
+  color: #92400e;
+}
+.import-stat--dup .import-stat-label {
+  color: #92400e;
+}
+.import-stat--update {
+  border-color: #bfdbfe;
+  background: #dbeafe;
+  color: #1e40af;
+}
+.import-stat--update .import-stat-label {
+  color: #1e40af;
+}
+
+/* per-guest field diffs (before -> after) in the "to update" list */
+.import-update {
+  gap: 4px;
+}
+.import-diffs {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  margin-top: 4px;
+}
+.import-diff {
+  display: grid;
+  grid-template-columns: minmax(90px, auto) 1fr auto 1fr;
+  align-items: baseline;
+  gap: 6px;
+  font-size: 0.75rem;
+}
+.import-diff-field {
+  color: var(--muted);
+  font-weight: 600;
+}
+.import-diff-before {
+  color: #b91c1c;
+  text-decoration: line-through;
+  overflow-wrap: anywhere;
+}
+.import-diff-arrow {
+  color: var(--muted);
+}
+.import-diff-after {
+  color: #15803d;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.import-foot-note {
+  margin-right: auto;
+  align-self: center;
+  font-size: 0.76rem;
+  color: var(--muted);
+}
+.import-lists {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+  padding: 0 20px;
+  min-height: 0;
+  overflow: hidden;
+}
+.import-list {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+.import-list h3 {
+  margin: 0 0 8px;
+  font-size: 0.82rem;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.import-list-count {
+  display: inline-block;
+  min-width: 20px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  text-align: center;
+  font-size: 0.72rem;
+  color: var(--muted);
+}
+.import-list-scroll {
+  flex: 1;
+  overflow-y: auto;
+  max-height: 58vh;
+  min-height: 160px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg, #fff);
+}
+.import-list-scroll ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+/* Repeated-rows section (shown only when the file has in-file duplicates). */
+.import-dups {
+  padding: 12px 20px 0;
+  flex: 0 0 auto;
+}
+.import-dups h3 {
+  color: #d97706;
+}
+.import-dups .import-list-scroll {
+  min-height: 0;
+  max-height: 20vh;
+  border-color: rgba(217, 119, 6, 0.4);
+  background: rgba(217, 119, 6, 0.06);
+}
+.import-list-scroll li {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border);
+}
+.import-list-scroll li:last-child {
+  border-bottom: none;
+}
+.import-name {
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+.import-sub {
+  font-size: 0.74rem;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+.import-dup-tag {
+  align-self: flex-start;
+  margin-top: 3px;
+  font-size: 0.66rem;
+  font-weight: 600;
+  color: #92400e;
+  background: #fef3c7;
+  border: 1px solid #fde68a;
+  padding: 1px 7px;
+  border-radius: 999px;
+}
+.import-list-empty {
+  padding: 12px;
+  font-size: 0.82rem;
+}
+.import-modal-foot {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 16px 20px 18px;
+}
+
+@media (max-width: 560px) {
+  .import-lists {
+    grid-template-columns: 1fr;
+  }
+  .import-list-scroll {
+    max-height: 30vh;
+  }
+}
+
+/* Full-screen poster slideshow (/admin/slideshow) */
+.slideshow {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  background: #000;
+  overflow: hidden;
+  cursor: pointer;
+}
+.slideshow-layer {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  transition: opacity 1s ease-in-out;
+  will-change: opacity;
+  user-select: none;
+}
+.slideshow-empty {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  text-align: center;
+  color: #e5e7eb;
+  padding: 24px;
+}
+.slideshow-empty h1 {
+  margin: 0;
+  font-size: 1.8rem;
+}
+.slideshow-empty p {
+  margin: 0;
+  color: #9ca3af;
+}
+.slideshow-exit {
+  position: absolute;
+  top: 16px;
+  right: 20px;
+  z-index: 3;
+  width: 42px;
+  height: 42px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  font-size: 1.2rem;
+  color: #fff;
+  background: rgba(0, 0, 0, 0.35);
+  text-decoration: none;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+.slideshow:hover .slideshow-exit {
+  opacity: 1;
+}
+.slideshow-badge {
+  position: absolute;
+  top: 16px;
+  left: 20px;
+  z-index: 3;
+  padding: 6px 14px;
+  border-radius: 999px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #fff;
+  background: rgba(0, 0, 0, 0.45);
+}
+.slideshow-controls {
+  position: absolute;
+  bottom: 22px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 3;
+  display: flex;
+  gap: 10px;
+  padding: 8px 12px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.4);
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+.slideshow:hover .slideshow-controls {
+  opacity: 1;
+}
+.slideshow-controls button {
+  width: 44px;
+  height: 44px;
+  border: none;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+  font-size: 1.1rem;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.slideshow-controls button:hover {
+  background: rgba(255, 255, 255, 0.28);
+}
+
+/* Fullscreen toggle button (shared across kiosk / slideshow / gallery) */
+.fs-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border: none;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.45);
+  color: #fff;
+  cursor: pointer;
+  -webkit-backdrop-filter: blur(4px);
+  backdrop-filter: blur(4px);
+}
+.fs-btn:hover {
+  background: rgba(0, 0, 0, 0.62);
+}
+.kiosk-fs {
+  position: absolute;
+  top: calc(env(safe-area-inset-top) + 10px);
+  right: calc(env(safe-area-inset-right) + 62px);
+  z-index: 5;
+}
+.slideshow-fs {
+  position: absolute;
+  top: 16px;
+  right: 70px;
+  z-index: 3;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+.slideshow:hover .slideshow-fs {
+  opacity: 1;
+}
+/* the gallery header is on the light theme, so match it */
+.gallery-fs {
+  flex: 0 0 auto;
+  background: var(--panel-2);
+  color: var(--text);
+  border: 1px solid var(--border);
+}
+.gallery-fs:hover {
+  background: var(--panel);
+}
+
+/* Gallery per-photo delete (trash + inline confirm) */
+.gthumb-del {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  z-index: 2;
+  width: 28px;
+  height: 28px;
+  border: none;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.5);
+  color: #fff;
+  cursor: pointer;
+  opacity: 0.7;
+  transition:
+    opacity 0.12s ease,
+    background 0.12s ease;
+}
+.gthumb:hover .gthumb-del {
+  opacity: 1;
+}
+.gthumb-del:hover {
+  background: var(--danger, #e0526a);
+}
+.gthumb-confirm {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 12px;
+  text-align: center;
+  background: rgba(0, 0, 0, 0.8);
+  color: #fff;
+  -webkit-backdrop-filter: blur(2px);
+  backdrop-filter: blur(2px);
+}
+.gthumb-confirm span {
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+.gthumb-confirm-actions {
+  display: flex;
+  gap: 8px;
+}
+
 /* Photo lightbox modal */
 .photo-backdrop {
   position: fixed;
@@ -2461,3 +3231,240 @@ th {
   padding: 14vh 0;
   color: var(--muted);
 }
+
+/* ---- QR check-in kiosk ---- */
+.qr-scan-icon {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 128px;
+  height: 128px;
+  margin: 0 auto 18px;
+  border-radius: 24px;
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+  overflow: hidden;
+}
+.qr-scan-beam {
+  position: absolute;
+  left: 12%;
+  right: 12%;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--accent);
+  box-shadow: 0 0 10px 2px color-mix(in srgb, var(--accent) 60%, transparent);
+  animation: qr-scan 1.9s ease-in-out infinite;
+}
+@keyframes qr-scan {
+  0%,
+  100% {
+    top: 22%;
+    opacity: 0.35;
+  }
+  50% {
+    top: 78%;
+    opacity: 1;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .qr-scan-beam {
+    animation: none;
+    top: 50%;
+  }
+}
+.qr-manual {
+  display: flex;
+  gap: 10px;
+  margin-top: 22px;
+}
+.qr-manual-input {
+  flex: 1;
+  min-width: 0;
+  padding: 12px 14px;
+  font-size: 1rem;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--bg, #fff);
+  color: inherit;
+}
+.qr-manual-input:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent);
+}
+
+/* Full-viewport event backdrop for public surfaces (e.g. /register). Sits above
+   the opaque app background; page content is lifted above it with z-index. */
+.page-bg {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  background: var(--page-bg-url, #000) center / cover no-repeat;
+  pointer-events: none;
+}
+/* Dim busy artwork a touch so the frosted card and its text stay legible. */
+.page-bg::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: rgba(8, 12, 20, 0.28);
+}
+
+/* The event backdrop is a wide (≈2.7:1) landscape composition on solid black.
+   On a portrait phone, `cover` would crop it down to a narrow centre slice and
+   cut off the title, so switch to `contain` — the letterbox bars are invisible
+   against the artwork's own black, and the full title stays readable. */
+@media (orientation: portrait) {
+  .page-bg,
+  .kiosk-stage--bg,
+  .kiosk-stage--checkin .kiosk-bg-layer {
+    background-size: contain;
+    background-color: #000;
+  }
+}
+
+/* Phone tuning for the register / self check-in card. */
+@media (max-width: 560px) {
+  .cx-stage {
+    padding-left: 12px;
+    padding-right: 12px;
+  }
+  .register-card {
+    padding: 22px 18px;
+    border-radius: 18px;
+  }
+  .register-title--in-card {
+    font-size: 1.4rem;
+    margin-bottom: 20px;
+  }
+  .register-stepper {
+    margin-bottom: 20px;
+  }
+  .register-step__label {
+    font-size: 0.62rem;
+  }
+  .register-step-heading {
+    font-size: 1.2rem;
+  }
+}
+
+/* ---- Poster designer ---- */
+.pd-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-bottom: 18px;
+}
+.pd-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+.pd-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 320px;
+  gap: 20px;
+  align-items: start;
+}
+@media (max-width: 900px) {
+  .pd-body { grid-template-columns: 1fr; }
+}
+.pd-stage-wrap { width: 100%; }
+.pd-stage {
+  position: relative;
+  overflow: hidden;
+  border-radius: 12px;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.28);
+  background: #0b1220;
+  touch-action: none;
+  user-select: none;
+}
+.pd-bg { position: absolute; inset: 0; display: block; }
+.pd-figure { position: absolute; opacity: 0.5; pointer-events: none; }
+.pd-el { position: absolute; cursor: move; }
+.pd-text {
+  white-space: nowrap;
+  line-height: 1;
+  cursor: move;
+}
+.pd-logo { display: block; }
+.pd-el--sel { outline: 2px dashed var(--accent); outline-offset: 2px; }
+.pd-resize {
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  background: var(--accent);
+  border: 2px solid #fff;
+  border-radius: 3px;
+  transform: translate(-50%, -50%);
+  cursor: nwse-resize;
+  z-index: 5;
+}
+.pd-hint { margin-top: 10px; font-size: 0.85rem; color: var(--muted); }
+.pd-panel {
+  background: var(--panel, #fff);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 16px;
+  position: sticky;
+  top: 16px;
+}
+.pd-props h3 { margin: 0 0 12px; }
+.pd-field { display: flex; flex-direction: column; gap: 6px; margin-bottom: 14px; }
+.pd-field > span { font-size: 0.82rem; color: var(--muted); }
+.pd-field textarea,
+.pd-field select {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font: inherit;
+  background: var(--bg, #fff);
+  color: inherit;
+}
+.pd-row { display: flex; gap: 12px; }
+.pd-row .pd-field { flex: 1; }
+.pd-field--color { flex: 0 0 auto; }
+.pd-field--color input[type="color"] {
+  width: 46px;
+  height: 34px;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: none;
+}
+.pd-seg { display: inline-flex; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+.pd-seg button {
+  border: none;
+  background: transparent;
+  padding: 7px 12px;
+  cursor: pointer;
+  text-transform: capitalize;
+  color: inherit;
+  font: inherit;
+}
+.pd-seg button.on { background: var(--accent); color: #fff; }
+.pd-toggles { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 12px; margin: 6px 0 16px; }
+.pd-toggles label { display: flex; align-items: center; gap: 6px; font-size: 0.9rem; }
+.pd-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  background: rgba(0, 0, 0, 0.72);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+.pd-modal-inner { text-align: center; max-width: 94vw; }
+.pd-modal-inner img {
+  max-width: 92vw;
+  max-height: 78vh;
+  border-radius: 10px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+}
+.pd-modal-inner .subtitle { color: #cbd5e1; margin-top: 12px; }

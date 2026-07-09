@@ -38,7 +38,7 @@ function isProtectedApi(request: NextRequest): boolean {
   // covers '/api/people/[id]'. Public APIs (/api/register, /api/health,
   // /api/login, /api/logout) are intentionally not listed here.
   //
-  // /api/settings GET is public (used by /early-checkin), but mutations are
+  // /api/settings GET is public (used by /checkin), but mutations are
   // admin-only. /api/admins is fully admin-only.
   if (pathname.startsWith("/api/admins")) return true;
   if (

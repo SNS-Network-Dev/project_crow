@@ -1,6 +1,6 @@
 import { Agent } from "undici";
 import { config } from "./config";
-import { allEmbeddings, countPeople } from "./db";
+import { allEmbeddings, countEmbeddedPeople } from "./db";
 
 // Client for the baremetal face-compute service (see baremetal-contract.md).
 // Only this bridge ever calls baremetal; the browser never does.
@@ -239,7 +239,7 @@ export async function ensureMatrixSynced(force = false): Promise<void> {
     return;
   }
 
-  const dbCount = await countPeople();
+  const dbCount = await countEmbeddedPeople();
   if (h.epoch !== lastEpoch || h.matrix_count !== dbCount) {
     const rows = await allEmbeddings();
     await matrixLoad(rows.map((r) => ({ person_id: r.id, embedding: r.embedding.toString("base64") })));

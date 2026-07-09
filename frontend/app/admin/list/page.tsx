@@ -7,10 +7,13 @@ import PeopleTable from "../components/PeopleTable";
 import PersonDrawer from "../components/PersonDrawer";
 import CheckinsTable from "../components/CheckinsTable";
 import LiveClock from "../components/LiveClock";
+import AddGuestModal from "../components/AddGuestModal";
 import { useToast } from "../../components/ToastProvider";
 import styles from "../components/admin.module.css";
 
 type Tab = "people" | "checkins" | "notCheckedIn";
+
+const PAGE_SIZE_OPTIONS = ["10", "20", "50", "100", "200", "all"];
 
 export default function ListPage() {
   const data = useAdminData();
@@ -18,6 +21,8 @@ export default function ListPage() {
   const [tab, setTab] = useState<Tab>("people");
   const [search, setSearch] = useState("");
   const [selectedId, setSelectedId] = useState<number | null>(null);
+  const [addingGuest, setAddingGuest] = useState(false);
+  const [pageSize, setPageSize] = useState<string>("10");
 
   const selectedPerson =
     selectedId != null
@@ -39,7 +44,7 @@ export default function ListPage() {
   const handleManualCheckin = useCallback(
     async (id: number, name: string) => {
       try {
-        const res = await fetch(`${BASE_PATH}/api/early-checkin/manual`, {
+        const res = await fetch(`${BASE_PATH}/api/checkin/manual`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ person_id: id }),
@@ -102,6 +107,28 @@ export default function ListPage() {
         >
           Not checked in ({notCheckedInCount})
         </button>
+        <button
+          type="button"
+          className="tabActionBtn"
+          onClick={() => setAddingGuest(true)}
+        >
+          + Add guest
+        </button>
+        <div className={styles.tabPageSize}>
+          <label htmlFor="crow-page-size">Show</label>
+          <select
+            id="crow-page-size"
+            value={pageSize}
+            onChange={(e) => setPageSize(e.target.value)}
+          >
+            {PAGE_SIZE_OPTIONS.map((opt) => (
+              <option key={opt} value={opt}>
+                {opt === "all" ? "ALL" : opt}
+              </option>
+            ))}
+          </select>
+          <span>/ page</span>
+        </div>
         <input
           className="tabSearch"
           type="text"
@@ -121,6 +148,7 @@ export default function ListPage() {
           people={data.people}
           checkins={data.checkins}
           search={search}
+          pageSize={pageSize}
           onSelect={openDrawer}
           onCheckin={handleManualCheckin}
           checkedInFilter="all"
@@ -133,6 +161,7 @@ export default function ListPage() {
           people={data.people}
           checkins={data.checkins}
           search={search}
+          pageSize={pageSize}
           onSelect={openDrawer}
           onDeleteCheckin={data.deleteCheckinById}
         />
@@ -143,6 +172,7 @@ export default function ListPage() {
           people={data.people}
           checkins={data.checkins}
           search={search}
+          pageSize={pageSize}
           onSelect={openDrawer}
           onCheckin={handleManualCheckin}
           checkedInFilter="notCheckedIn"
@@ -155,6 +185,17 @@ export default function ListPage() {
         onDelete={handleDelete}
         onClose={closeDrawer}
       />
+
+      {addingGuest && (
+        <AddGuestModal
+          onClose={() => setAddingGuest(false)}
+          onAdded={(name) => {
+            setAddingGuest(false);
+            toast.show(`${name} added.`, "ok");
+            data.refreshAll();
+          }}
+        />
+      )}
     </main>
   );
 }

@@ -15,4 +15,4 @@ Options -Indexes
 </FilesMatch>
 
 # Block internal app directories outright.
-RedirectMatch 403 ^/project_crow/(frontend|db|node_modules|data)(/|$)
+RedirectMatch 403 ^/kelvinpahbirthday/(frontend|db|node_modules|data)(/|$)

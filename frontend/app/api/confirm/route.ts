@@ -1,5 +1,10 @@
 import { NextResponse } from "next/server";
-import { getPerson, latestCheckinForPerson, logCheckin } from "@/lib/db";
+import {
+  getPerson,
+  latestCheckinForPerson,
+  logCheckin,
+  type CheckinMethod,
+} from "@/lib/db";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -9,6 +14,9 @@ export async function POST(request: Request) {
   const personId = Number(body?.person_id);
   const scoreRaw = Number(body?.score ?? 0);
   const score = Number.isFinite(scoreRaw) ? scoreRaw : 0;
+  // Which surface did the check-in: 'self' (guest on /checkin) vs 'face'
+  // (operator/kiosk recognition, the default). Both use face matching.
+  const method: CheckinMethod = body?.method === "self" ? "self" : "face";
 
   if (!Number.isInteger(personId) || personId <= 0) {
     return NextResponse.json(
@@ -36,7 +44,7 @@ export async function POST(request: Request) {
     });
   }
 
-  await logCheckin(personId, score);
+  await logCheckin(personId, score, method);
   return NextResponse.json({
     ok: true,
     name: person.name,

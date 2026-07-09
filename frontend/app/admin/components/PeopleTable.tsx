@@ -19,24 +19,23 @@ interface Props {
   people: Person[];
   checkins: Checkin[];
   search: string;
+  pageSize: string;
   onSelect: (id: number) => void;
   onCheckin?: (id: number, name: string) => void;
   checkedInFilter?: CheckedInFilter;
   prioritizeNotCheckedIn?: boolean;
 }
 
-const PAGE_SIZE_OPTIONS = ["10", "20", "50", "100", "200", "all"];
-
 export default function PeopleTable({
   people,
   checkins,
   search,
+  pageSize,
   onSelect,
   onCheckin,
   checkedInFilter = "all",
   prioritizeNotCheckedIn = false,
 }: Props) {
-  const [pageSize, setPageSize] = useState<string>("10");
   const [page, setPage] = useState(1);
 
   const checkedInIds = useMemo(
@@ -96,8 +95,8 @@ export default function PeopleTable({
               <th className={styles.colRemarks}>Remarks</th>
               <th className={styles.colInvited}>Invited by</th>
               <th className={styles.colRegistered}>Registered when</th>
-              {onCheckin && <th className={styles.colCheckin}>Check in</th>}
               <th className="td-qr">QR</th>
+              {onCheckin && <th className={styles.colCheckin}>Check in</th>}
             </tr>
           </thead>
           <tbody>
@@ -153,6 +152,9 @@ export default function PeopleTable({
                       minute: "2-digit",
                     })}
                   </td>
+                  <td className="td-qr" title={p.qr_code_path ?? undefined}>
+                    {p.qr_code_path ?? DASH}
+                  </td>
                   {onCheckin && (
                     <td className={styles.colCheckin}>
                       <button
@@ -170,9 +172,6 @@ export default function PeopleTable({
                       </button>
                     </td>
                   )}
-                  <td className="td-qr" title={p.qr_code_path ?? undefined}>
-                    {p.qr_code_path ?? DASH}
-                  </td>
                 </tr>
               );
             })}
@@ -181,29 +180,6 @@ export default function PeopleTable({
       </div>
 
       <div className={styles.tableFooter}>
-        <div className={styles.pageSizeWrap}>
-          <label htmlFor="crow-page-size" className={styles.pageSizeLabel}>
-            Show
-          </label>
-          <select
-            id="crow-page-size"
-            className={styles.select}
-            value={pageSize}
-            onChange={(e) => setPageSize(e.target.value)}
-          >
-            {PAGE_SIZE_OPTIONS.map((opt) => (
-              <option key={opt} value={opt}>
-                {opt === "all" ? "ALL" : opt}
-              </option>
-            ))}
-          </select>
-          <span>per page</span>
-        </div>
-
-        <div className={styles.resultCount}>
-          {filtered.length} of {people.length} guests
-        </div>
-
         {totalPages > 1 && (
           <div className={styles.pager}>
             <button

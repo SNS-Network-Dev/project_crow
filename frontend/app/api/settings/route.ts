@@ -51,6 +51,9 @@ export async function POST(request: Request) {
   // trimmed + capped (blank clears the override → baremetal house default).
   const clampInt = (v: unknown, lo: number, hi: number) =>
     Math.min(hi, Math.max(lo, Math.round(Number(v)) || lo));
+  if (body.earlyCheckinHoursBefore != null) {
+    patch.earlyCheckinHoursBefore = clampInt(body.earlyCheckinHoursBefore, 0, 72);
+  }
   if (body.avatarKelvinVariants != null) {
     patch.avatarKelvinVariants = clampInt(body.avatarKelvinVariants, 1, 4);
   }

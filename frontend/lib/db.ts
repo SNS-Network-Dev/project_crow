@@ -55,6 +55,7 @@ export interface CheckinRow extends RowDataPacket {
   person_id: number;
   name: string;
   score: number;
+  method: string | null; // 'face' | 'manual' | 'qr'; null for legacy rows
   checked_in_at: string;
 }
 
@@ -79,6 +80,11 @@ const PERSON_COLS = [
 
 // ---------- people ----------
 
+// Guests imported from the registration spreadsheet have no face yet — they get
+// the /register link later (optional face enrolment). Their embedding column is
+// empty (0 bytes) until then; NOT-NULL varbinary is satisfied by an empty value.
+const EMPTY_EMBEDDING = Buffer.alloc(0);
+
 export async function createPerson(p: {
   name: string;
   email?: string | null;
@@ -90,7 +96,7 @@ export async function createPerson(p: {
   details?: string | null; // JSON string or null (legacy)
   remarks?: string | null;
   qrCode?: string | null;
-  embedding: Buffer; // raw 2048 bytes (512 x float32 LE)
+  embedding?: Buffer; // raw 2048 bytes (512 x float32 LE); empty for un-enrolled imports
   consent: boolean;
 }): Promise<number> {
   const [res] = await pool.execute<ResultSetHeader>(
@@ -109,7 +115,7 @@ export async function createPerson(p: {
       p.details ?? null,
       p.remarks ?? null,
       p.qrCode ?? null,
-      p.embedding,
+      p.embedding ?? EMPTY_EMBEDDING,
       p.consent ? new Date() : null,
     ],
   );
@@ -141,6 +147,18 @@ export async function qrCodeExists(code: string): Promise<boolean> {
     [code],
   );
   return rows.length > 0;
+}
+
+// Look up a guest by the unique code embedded in their QR (stored in
+// qr_code_path). Used by the QR check-in kiosk (/api/checkin/qr).
+export async function getPersonByQrCode(
+  code: string,
+): Promise<PersonRow | null> {
+  const [rows] = await pool.query<PersonRow[]>(
+    `SELECT ${PERSON_COLS} FROM project_crow_people WHERE qr_code_path = ? LIMIT 1`,
+    [code],
+  );
+  return rows[0] ?? null;
 }
 
 export async function setPhotoPath(
@@ -211,12 +229,95 @@ export async function countPeople(): Promise<number> {
   return Number(rows[0].c);
 }
 
-/** All (id, embedding) rows — used to (re)hydrate the baremetal matrix. */
+/**
+ * (id, embedding) rows for enrolled faces only — used to (re)hydrate the
+ * baremetal matrix. Imported guests who haven't done face registration have an
+ * empty (0-byte) embedding; they must be excluded or the matrix would try to
+ * load zero-length vectors. Only full 2048-byte embeddings are real faces.
+ */
 export async function allEmbeddings(): Promise<EmbeddingRow[]> {
   const [rows] = await pool.query<EmbeddingRow[]>(
-    `SELECT id, embedding FROM project_crow_people ORDER BY id ASC`,
+    `SELECT id, embedding FROM project_crow_people
+      WHERE LENGTH(embedding) = 2048 ORDER BY id ASC`,
   );
   return rows;
+}
+
+/**
+ * Count of people with an enrolled face (full embedding). This — not the total
+ * head-count — is what the baremetal matrix holds, so it's the correct number
+ * for matrix drift detection once photo-less imported guests exist.
+ */
+export async function countEmbeddedPeople(): Promise<number> {
+  const [rows] = await pool.query<RowDataPacket[]>(
+    `SELECT COUNT(*) AS c FROM project_crow_people WHERE LENGTH(embedding) = 2048`,
+  );
+  return Number(rows[0].c);
+}
+
+// A person's identity for dedup: name + company email together. Two rows are
+// only duplicates when BOTH match — so different people who happen to share a
+// company inbox (e.g. one person registering on another's email) are NOT merged.
+// When there's no email, the name alone is the key.
+export function dedupKey(
+  name: string | null,
+  email: string | null,
+): string {
+  const n = (name ?? "").trim().toLowerCase().replace(/\s+/g, " ");
+  const e = (email ?? "").trim().toLowerCase();
+  return e ? `${n}|${e}` : `name:${n}`;
+}
+
+// Dedup keys for every current person, so a spreadsheet import can skip guests
+// already in the DB.
+export async function existingDedupKeys(): Promise<Set<string>> {
+  const [rows] = await pool.query<RowDataPacket[]>(
+    `SELECT name, company_email FROM project_crow_people`,
+  );
+  const keys = new Set<string>();
+  for (const r of rows) keys.add(dedupKey(r.name, r.company_email));
+  return keys;
+}
+
+// The subset of a person's fields the spreadsheet import compares against, so an
+// upload can detect which existing guests have changed and update them.
+export interface ImportMatchPerson {
+  id: number;
+  name: string;
+  contact_number: string | null;
+  company_email: string | null;
+  full_company_name: string | null;
+  designation: string | null;
+  invited_by: string | null;
+  remarks: string | null;
+  consent_at: string | null;
+}
+
+// All current people indexed by dedup key (name + company email), for the import
+// upsert: matched keys become updates (if any field differs) instead of skips.
+export async function existingPeopleForImport(): Promise<
+  Map<string, ImportMatchPerson>
+> {
+  const [rows] = await pool.query<RowDataPacket[]>(
+    `SELECT id, name, contact_number, company_email, full_company_name,
+            designation, invited_by, remarks, consent_at
+       FROM project_crow_people`,
+  );
+  const map = new Map<string, ImportMatchPerson>();
+  for (const r of rows) {
+    map.set(dedupKey(r.name, r.company_email), {
+      id: r.id,
+      name: r.name,
+      contact_number: r.contact_number,
+      company_email: r.company_email,
+      full_company_name: r.full_company_name,
+      designation: r.designation,
+      invited_by: r.invited_by,
+      remarks: r.remarks,
+      consent_at: r.consent_at,
+    });
+  }
+  return map;
 }
 
 export async function updatePerson(
@@ -280,13 +381,20 @@ export async function updatePerson(
 
 // ---------- checkins ----------
 
+// method records how the check-in happened: 'face' (operator/kiosk recognition),
+// 'self' (guest self-check-in on /checkin), 'manual' (operator picked from
+// the list), or 'qr' (QR-code kiosk). Kept alongside the face-match score so the
+// admin check-in table can show the method.
+export type CheckinMethod = "face" | "self" | "manual" | "qr";
+
 export async function logCheckin(
   personId: number,
   score: number,
+  method: CheckinMethod,
 ): Promise<number> {
   const [res] = await pool.execute<ResultSetHeader>(
-    `INSERT INTO project_crow_checkins (person_id, score) VALUES (?, ?)`,
-    [personId, score],
+    `INSERT INTO project_crow_checkins (person_id, score, method) VALUES (?, ?, ?)`,
+    [personId, score, method],
   );
   return res.insertId;
 }
@@ -298,7 +406,7 @@ export async function latestCheckinForPerson(
   personId: number,
 ): Promise<CheckinRow | null> {
   const [rows] = await pool.query<CheckinRow[]>(
-    `SELECT c.id, c.person_id, p.name, c.score, c.checked_in_at
+    `SELECT c.id, c.person_id, p.name, c.score, c.method, c.checked_in_at
        FROM project_crow_checkins c
        JOIN project_crow_people p ON p.id = c.person_id
       WHERE c.person_id = ?
@@ -312,7 +420,7 @@ export async function latestCheckinForPerson(
 export async function recentCheckins(limit = 50): Promise<CheckinRow[]> {
   const safeLimit = Math.min(Math.max(Math.trunc(limit) || 0, 1), 500);
   const [rows] = await pool.query<CheckinRow[]>(
-    `SELECT c.id, c.person_id, p.name, c.score, c.checked_in_at
+    `SELECT c.id, c.person_id, p.name, c.score, c.method, c.checked_in_at
        FROM project_crow_checkins c
        JOIN project_crow_people p ON p.id = c.person_id
       ORDER BY c.checked_in_at DESC
@@ -360,7 +468,7 @@ export async function checkinsForPerson(
 ): Promise<CheckinRow[]> {
   const safeLimit = Math.min(Math.max(Math.trunc(limit) || 0, 1), 500);
   const [rows] = await pool.query<CheckinRow[]>(
-    `SELECT c.id, c.person_id, p.name, c.score, c.checked_in_at
+    `SELECT c.id, c.person_id, p.name, c.score, c.method, c.checked_in_at
        FROM project_crow_checkins c
        JOIN project_crow_people p ON p.id = c.person_id
       WHERE c.person_id = ?

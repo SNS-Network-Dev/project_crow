@@ -27,6 +27,7 @@ export interface Checkin {
   person_id: number;
   name: string;
   score: number;
+  method: string | null; // 'face' | 'manual' | 'qr'; null for legacy rows
   checked_in_at: string;
 }
 
@@ -166,6 +167,16 @@ export function useAdminData(): AdminData {
       inFlight.current.delete("all");
     };
   }, []);
+
+  // Refresh everything when another part of the app (e.g. the sidebar Excel
+  // import) broadcasts that the people/check-in data changed.
+  useEffect(() => {
+    const onRefresh = () => {
+      refreshAll();
+    };
+    window.addEventListener("crow-data-refresh", onRefresh);
+    return () => window.removeEventListener("crow-data-refresh", onRefresh);
+  }, [refreshAll]);
 
   // Poll check-ins + stats while the tab is visible. Pauses when hidden so a
   // background tab doesn't stack requests.

@@ -17,25 +17,34 @@ function initials(name: string): string {
   return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
 }
 
+// How a guest checked in. Legacy rows have no method stored, so fall back to the
+// score: a positive match score means face recognition, otherwise manual.
+function checkinMethod(c: Checkin): { label: string; kind: string } {
+  const m = c.method ?? (c.score > 0 ? "face" : "manual");
+  if (m === "face") return { label: "Face", kind: "face" };
+  if (m === "qr") return { label: "QR", kind: "qr" };
+  if (m === "self") return { label: "Self", kind: "self" };
+  return { label: "Manual", kind: "manual" };
+}
+
 interface Props {
   people: Person[];
   checkins: Checkin[];
   search: string;
+  pageSize: string;
   onSelect: (id: number) => void;
   onDeleteCheckin: (id: number) => Promise<boolean>;
 }
-
-const PAGE_SIZE_OPTIONS = ["10", "20", "50", "100", "200", "all"];
 
 export default function CheckinsTable({
   people,
   checkins,
   search,
+  pageSize,
   onSelect,
   onDeleteCheckin,
 }: Props) {
   const toast = useToast();
-  const [pageSize, setPageSize] = useState<string>("10");
   const [page, setPage] = useState(1);
   const [deletingId, setDeletingId] = useState<number | null>(null);
 
@@ -95,6 +104,7 @@ export default function CheckinsTable({
               <th>Full Name</th>
               <th className={styles.colCompany}>Company</th>
               <th className={styles.colRemarks}>Remarks</th>
+              <th className={styles.colMethod}>Method</th>
               <th className={styles.colTime}>Checked in time</th>
               <th className={styles.colUndo}>Undo</th>
             </tr>
@@ -102,7 +112,7 @@ export default function CheckinsTable({
           <tbody>
             {filtered.length === 0 && (
               <tr>
-                <td colSpan={8} className={styles.emptyRow}>
+                <td colSpan={9} className={styles.emptyRow}>
                   No check-ins yet.
                 </td>
               </tr>
@@ -137,6 +147,16 @@ export default function CheckinsTable({
                 >
                   {p?.remarks ?? DASH}
                 </td>
+                <td className={styles.colMethod}>
+                  {(() => {
+                    const m = checkinMethod(c);
+                    return (
+                      <span className={`method-badge method-badge--${m.kind}`}>
+                        {m.label}
+                      </span>
+                    );
+                  })()}
+                </td>
                 <td className={styles.colTime}>
                   {new Date(c.checked_in_at).toLocaleString("en-US", {
                     year: "numeric",
@@ -166,32 +186,6 @@ export default function CheckinsTable({
       </div>
 
       <div className={styles.tableFooter}>
-        <div className={styles.pageSizeWrap}>
-          <label
-            htmlFor="crow-checkin-page-size"
-            className={styles.pageSizeLabel}
-          >
-            Show
-          </label>
-          <select
-            id="crow-checkin-page-size"
-            className={styles.select}
-            value={pageSize}
-            onChange={(e) => setPageSize(e.target.value)}
-          >
-            {PAGE_SIZE_OPTIONS.map((opt) => (
-              <option key={opt} value={opt}>
-                {opt === "all" ? "ALL" : opt}
-              </option>
-            ))}
-          </select>
-          <span>per page</span>
-        </div>
-
-        <div className={styles.resultCount}>
-          {filtered.length} of {checkins.length} checked in
-        </div>
-
         {totalPages > 1 && (
           <div className={styles.pager}>
             <button

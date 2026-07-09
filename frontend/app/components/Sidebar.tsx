@@ -1,14 +1,22 @@
 "use client";
 
 import Link from "next/link";
-import type { ReactNode } from "react";
+import type { ChangeEvent, ReactNode } from "react";
 import { useEffect, useId, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { useSyncExternalStore } from "react";
 import { BASE_PATH } from "@/lib/basePath";
 import { useAdminHome } from "./useAdminHome";
+import { useToast } from "./ToastProvider";
+import ImportPreviewModal, { type ImportSummary } from "./ImportPreviewModal";
 
-type NavItem = { href: string; label: string; icon: ReactNode; exact?: boolean };
+type NavItem = {
+  href: string;
+  label: string;
+  icon: ReactNode;
+  exact?: boolean;
+  disabled?: boolean;
+};
 
 // The sidebar mirrors aimy_chat's company_admin sidebar: a white→slate gradient
 // rail with lucide-style icon nav, a teal-tinted active state, and a sticky
@@ -50,9 +58,25 @@ const ADMIN_ITEMS: NavItem[] = [
     ),
   },
   {
+    href: "/admin/qr-checkin",
+    label: "QR check in",
+    icon: (
+      <svg viewBox="0 0 24 24" width="16" height="16" {...stroke}>
+        <rect x="3" y="3" width="7" height="7" rx="1" />
+        <rect x="14" y="3" width="7" height="7" rx="1" />
+        <rect x="3" y="14" width="7" height="7" rx="1" />
+        <line x1="14" y1="14" x2="14" y2="17" />
+        <line x1="17" y1="14" x2="21" y2="14" />
+        <line x1="21" y1="14" x2="21" y2="21" />
+        <line x1="14" y1="21" x2="17" y2="21" />
+      </svg>
+    ),
+  },
+  {
     href: "/admin/avatar",
     label: "Photo booth",
     exact: true,
+    disabled: true,
     icon: (
       <svg viewBox="0 0 24 24" width="16" height="16" {...stroke}>
         <path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z" />
@@ -63,6 +87,7 @@ const ADMIN_ITEMS: NavItem[] = [
   {
     href: "/admin/avatar/gallery",
     label: "Photo gallery",
+    disabled: true,
     icon: (
       <svg viewBox="0 0 24 24" width="16" height="16" {...stroke}>
         <rect width="18" height="18" x="3" y="3" rx="2" ry="2" />
@@ -72,8 +97,34 @@ const ADMIN_ITEMS: NavItem[] = [
     ),
   },
   {
+    href: "/admin/slideshow",
+    label: "Slide show",
+    disabled: true,
+    icon: (
+      <svg viewBox="0 0 24 24" width="16" height="16" {...stroke}>
+        <rect x="2" y="3" width="20" height="14" rx="2" />
+        <path d="M10 8.5v3l3-1.5z" />
+        <line x1="8" y1="21" x2="16" y2="21" />
+        <line x1="12" y1="17" x2="12" y2="21" />
+      </svg>
+    ),
+  },
+  {
+    href: "/admin/poster",
+    label: "Poster designer",
+    disabled: true,
+    icon: (
+      <svg viewBox="0 0 24 24" width="16" height="16" {...stroke}>
+        <rect x="3" y="3" width="18" height="18" rx="2" />
+        <path d="M3 15l5-5 4 4 3-3 6 6" />
+        <circle cx="8.5" cy="8.5" r="1.5" />
+      </svg>
+    ),
+  },
+  {
     href: "/admin/booth",
     label: "Booth control",
+    disabled: true,
     icon: (
       <svg viewBox="0 0 24 24" width="16" height="16" {...stroke}>
         <line x1="4" y1="21" x2="4" y2="14" />
@@ -166,10 +217,50 @@ export default function Sidebar() {
   const collapsed = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
   const isAdmin = useSyncExternalStore(adminSubscribe, adminSnapshot, adminServerSnapshot);
   const homeHref = useAdminHome();
+  const toast = useToast();
 
   const [menuOpen, setMenuOpen] = useState(false);
+  const [email, setEmail] = useState<string | null>(null);
+  const [importFile, setImportFile] = useState<File | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const menuId = useId();
+
+  // Fetch the signed-in admin's email to show in the account trigger.
+  useEffect(() => {
+    if (!isAdmin) return;
+    let cancelled = false;
+    fetch(`${BASE_PATH}/api/me`, { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((b) => {
+        if (!cancelled && b) setEmail((b.email as string | null) ?? null);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [isAdmin]);
+
+  // Bulk-import guests from a registration .xlsx. Selecting a file opens a
+  // preview modal (what will be added vs skipped) before anything is inserted.
+  const handleImportFile = (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = ""; // let the same file be re-selected later
+    if (!file) return;
+    setMenuOpen(false);
+    setImportFile(file);
+  };
+
+  // Called after the operator confirms the import in the modal. Broadcast so any
+  // open admin view refreshes its data.
+  const handleImported = (s: ImportSummary) => {
+    setImportFile(null);
+    const parts = [`${s.inserted} added`];
+    if (s.updated) parts.push(`${s.updated} updated`);
+    if (s.failed) parts.push(`${s.failed} failed`);
+    toast.show(`Import complete — ${parts.join(", ")}.`, s.failed ? "info" : "ok");
+    window.dispatchEvent(new Event("crow-data-refresh"));
+  };
 
   // Close the account dropdown on outside click / Escape (mirrors aimy's menu).
   useEffect(() => {
@@ -214,28 +305,50 @@ export default function Sidebar() {
     pathname === it.href ||
     (!it.exact && it.href !== "/" && !!pathname?.startsWith(it.href + "/"));
 
-  const renderItem = (it: NavItem) => (
-    <Link
-      key={it.href}
-      href={it.href}
-      className={`navItem ${isActive(it) ? "navItem--active" : ""}`}
-      title={collapsed ? it.label : undefined}
-    >
-      <span className="navIcon" aria-hidden>
-        {it.icon}
+  const renderItem = (it: NavItem) =>
+    it.disabled ? (
+      <span
+        key={it.href}
+        className="navItem navItem--disabled"
+        aria-disabled="true"
+        title={collapsed ? it.label : undefined}
+      >
+        <span className="navIcon" aria-hidden>
+          {it.icon}
+        </span>
+        <span className="navLabel sidebar-text">{it.label}</span>
       </span>
-      <span className="navLabel sidebar-text">{it.label}</span>
-    </Link>
-  );
+    ) : (
+      <Link
+        key={it.href}
+        href={it.href}
+        className={`navItem ${isActive(it) ? "navItem--active" : ""}`}
+        title={collapsed ? it.label : undefined}
+      >
+        <span className="navIcon" aria-hidden>
+          {it.icon}
+        </span>
+        <span className="navLabel sidebar-text">{it.label}</span>
+      </Link>
+    );
 
   return (
+    <>
+    {importFile && (
+      <ImportPreviewModal
+        file={importFile}
+        onCancel={() => setImportFile(null)}
+        onImported={handleImported}
+      />
+    )}
     <aside className={`sidebar ${collapsed ? "sidebar--collapsed" : ""}`}>
       <div className="sidebarHead">
-        <Link href={homeHref} className="sidebarBrand" title="Project Crow">
+        <Link href={homeHref} className="sidebarBrand" title="Kelvin Pah's Birthday">
           <span className="sidebarBrandMark" aria-hidden>
-            PC
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={`${BASE_PATH}/kelvin-mark.png`} alt="" />
           </span>
-          <span className="sidebarBrandName sidebar-text">Project Crow</span>
+          <span className="sidebarBrandName sidebar-text">Kelvin Pah&apos;s Birthday</span>
         </Link>
         <button
           type="button"
@@ -278,7 +391,31 @@ export default function Sidebar() {
       {isAdmin && (
         <div className={`sidebarBottom ${menuOpen ? "sidebarBottom--open" : ""}`} ref={bottomRef}>
           <div className={`sidebarAccountMenu ${menuOpen ? "open" : ""}`} id={menuId} role="menu">
-            <div className="sidebarAccountMenuHeader">Operator · Project Crow</div>
+            <div className="sidebarAccountMenuHeader">
+              {email ? `Admin · ${email}` : "Admin"}
+            </div>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+              style={{ display: "none" }}
+              onChange={handleImportFile}
+            />
+            <button
+              type="button"
+              className="accountItem"
+              role="menuitem"
+              onClick={() => fileInputRef.current?.click()}
+            >
+              <span className="navIcon" aria-hidden>
+                <svg viewBox="0 0 24 24" width="16" height="16" {...stroke}>
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                  <polyline points="17 8 12 3 7 8" />
+                  <line x1="12" x2="12" y1="3" y2="15" />
+                </svg>
+              </span>
+              <span className="sidebar-text">Import Excel</span>
+            </button>
             <Link
               href="/register"
               className="accountItem"
@@ -322,11 +459,12 @@ export default function Sidebar() {
             title={collapsed ? "Account" : undefined}
           >
             <span className="accountAvatar" aria-hidden>
-              PC
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={`${BASE_PATH}/kelvin-mark.png`} alt="" />
             </span>
             <span className="accountMeta sidebar-text">
-              <span className="accountName">Operator</span>
-              <span className="accountSub">Project Crow</span>
+              <span className="accountName">Admin</span>
+              <span className="accountSub">{email ?? "Admin account"}</span>
             </span>
             <svg className="accountChevron sidebar-text" viewBox="0 0 24 24" width="16" height="16" {...stroke} aria-hidden>
               <path d="m18 15-6-6-6 6" />
@@ -335,5 +473,6 @@ export default function Sidebar() {
         </div>
       )}
     </aside>
+    </>
   );
 }

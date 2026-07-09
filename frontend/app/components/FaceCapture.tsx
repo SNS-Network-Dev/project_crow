@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import { BASE_PATH } from "@/lib/basePath";
 import useFaceAutoCapture from "./useFaceAutoCapture";
 
 // Fullscreen take-photo modal for /register. Uses the same MediaPipe BlazeFace
@@ -52,10 +53,18 @@ export default function FaceCapture({
   if (errorText) onError?.(errorText);
 
   return (
-    <div className="kiosk-stage">
+    <div
+      className="kiosk-stage kiosk-stage--bg kiosk-stage--checkin"
+      style={{ ["--kiosk-bg-url" as string]: `url("${BASE_PATH}/kelvin-bg.jpg")` }}
+    >
+      <div
+        className="kiosk-bg-layer"
+        style={{ ["--kiosk-bg-url" as string]: `url("${BASE_PATH}/kelvin-bg.jpg")` }}
+        aria-hidden
+      />
       <video
         ref={videoRef}
-        className="kiosk-video"
+        className={`kiosk-video${phase === "idle" ? " kiosk-video--idle" : ""}`}
         playsInline
         muted
         autoPlay

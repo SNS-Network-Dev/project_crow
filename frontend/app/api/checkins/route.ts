@@ -23,6 +23,7 @@ export async function GET(request: Request) {
         person_id: r.person_id,
         name: r.name,
         score: r.score,
+        method: r.method,
         checked_in_at: r.checked_in_at,
       })),
     });
@@ -36,6 +37,7 @@ export async function GET(request: Request) {
       person_id: r.person_id,
       name: r.name,
       score: r.score,
+      method: r.method,
       checked_in_at: r.checked_in_at,
     })),
   });

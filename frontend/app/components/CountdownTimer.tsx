@@ -6,6 +6,7 @@ interface Props {
   targetIso: string;
   enabled?: boolean;
   eventName?: string;
+  hoursBefore?: number;
 }
 
 function pad(n: number) {
@@ -16,6 +17,7 @@ export default function CountdownTimer({
   targetIso,
   enabled = true,
   eventName = "the event",
+  hoursBefore = 1,
 }: Props) {
   const target = useMemo(() => new Date(targetIso).getTime(), [targetIso]);
   const [now, setNow] = useState(Date.now());
@@ -58,7 +60,8 @@ export default function CountdownTimer({
         </div>
       </div>
       <p className="register-countdown__hint">
-        You can check in one hour before {eventName} starts.
+        You can check in {hoursBefore} {hoursBefore === 1 ? "hour" : "hours"}{" "}
+        before the event starts.
       </p>
     </div>
   );

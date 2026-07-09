@@ -194,7 +194,6 @@ export default function PersonDrawer({ person, onPatch, onDelete, onClose }: Pro
                   <section className={styles.detailSection}>
                     <h3 className={styles.detailHeading}>Personal</h3>
                     <DetailField label="Contact number" value={person.contact_number} />
-                    <DetailField label="Personal email" value={person.email} />
                   </section>
                   <section className={styles.detailSection}>
                     <h3 className={styles.detailHeading}>Company</h3>
@@ -211,7 +210,7 @@ export default function PersonDrawer({ person, onPatch, onDelete, onClose }: Pro
                 <DetailField label="Remarks" value={person.remarks} />
                 <DetailField
                   label="Consent"
-                  value={person.consent_at ? `yes · ${new Date(person.consent_at).toLocaleString()}` : "no"}
+                  value={person.consent_at ? "yes" : "no"}
                 />
                 <DetailField
                   label="Last modified"
@@ -237,7 +236,17 @@ export default function PersonDrawer({ person, onPatch, onDelete, onClose }: Pro
                       <li key={c.id} className={styles.historyItem}>
                         <span className={styles.historyWhen}>{new Date(c.checked_in_at).toLocaleString()}</span>
                         <span className={styles.historyScore}>
-                          {c.score > 0 ? `${(c.score * 100).toFixed(0)}%` : "manual"}
+                          {(() => {
+                            const m = c.method ?? (c.score > 0 ? "face" : "manual");
+                            if (m === "qr") return "QR";
+                            if (m === "self")
+                              return c.score > 0
+                                ? `Self · ${(c.score * 100).toFixed(0)}%`
+                                : "Self";
+                            if (m === "face" || c.score > 0)
+                              return `Face · ${(c.score * 100).toFixed(0)}%`;
+                            return "Manual";
+                          })()}
                         </span>
                       </li>
                     ))}
@@ -254,10 +263,6 @@ export default function PersonDrawer({ person, onPatch, onDelete, onClose }: Pro
               <label>
                 Contact number
                 <input type="tel" value={form.contactNumber} onChange={(e) => setField("contactNumber", e.target.value)} />
-              </label>
-              <label>
-                Personal email
-                <input type="email" value={form.email} onChange={(e) => setField("email", e.target.value)} />
               </label>
               <label>
                 Company email

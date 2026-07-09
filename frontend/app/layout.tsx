@@ -11,7 +11,7 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "Project Crow — Face Check-In",
+  title: "Kelvin Pah's Birthday",
   description: "Face-recognition check-in: register, kiosk, and phone check-in.",
 };
 

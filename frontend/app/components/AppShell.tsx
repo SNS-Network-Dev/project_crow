@@ -7,12 +7,13 @@ import Sidebar from "./Sidebar";
 // /admin/settings) and the photo gallery (/admin/avatar/gallery). Admin
 // full-screen tools (/admin/checkin, /admin/avatar, /kiosk) render bare so the
 // camera/stage can use the whole viewport; they're still gated by proxy.ts,
-// just without the rail. Public surfaces (/register, /login, /early-checkin,
+// just without the rail. Public surfaces (/register, /login, /checkin,
 // and the / redirect) are also bare.
 const SIDEBAR_ADMIN_PREFIXES = [
   "/admin/list",
   "/admin/settings",
   "/admin/booth",
+  "/admin/poster",
   "/admin/avatar/gallery",
 ];
 

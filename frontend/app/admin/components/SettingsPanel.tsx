@@ -7,6 +7,7 @@ export interface AppSettingsResponse {
   eventName: string;
   eventStartIso: string;
   earlyCheckinCountdownEnabled: boolean;
+  earlyCheckinHoursBefore: number;
   earlyCheckinTargetIso: string;
 }
 
@@ -48,6 +49,7 @@ export default function SettingsPanel() {
           eventName: settings.eventName,
           eventStartIso: settings.eventStartIso,
           earlyCheckinCountdownEnabled: settings.earlyCheckinCountdownEnabled,
+          earlyCheckinHoursBefore: settings.earlyCheckinHoursBefore,
         }),
       });
       const data = await res.json().catch(() => ({}));
@@ -88,7 +90,7 @@ export default function SettingsPanel() {
           onChange={(e) =>
             setSettings((s) => (s ? { ...s, eventName: e.target.value } : s))
           }
-          placeholder="e.g. Project Crow Annual Dinner"
+          placeholder="e.g. Kelvin Pah's Birthday"
         />
       </div>
 
@@ -125,7 +127,7 @@ export default function SettingsPanel() {
         <div>
           <strong>Self check-in countdown</strong>
           <p className="subtitle" style={{ margin: "4px 0 0" }}>
-            Show a countdown on the self check-in page until one hour before the event.
+            Show a countdown on the self check-in page until check-in opens.
           </p>
         </div>
         <button
@@ -146,6 +148,34 @@ export default function SettingsPanel() {
         >
           {settings.earlyCheckinCountdownEnabled ? "On" : "Off"}
         </button>
+      </div>
+
+      <div className="register-field" style={{ marginTop: 16 }}>
+        <label htmlFor="settings-early-hours">
+          Open self check-in this many hours before the event
+        </label>
+        <input
+          id="settings-early-hours"
+          type="number"
+          min={0}
+          max={72}
+          step={1}
+          value={settings.earlyCheckinHoursBefore}
+          onChange={(e) => {
+            const n = Math.round(Number(e.target.value));
+            setSettings((s) =>
+              s
+                ? {
+                    ...s,
+                    earlyCheckinHoursBefore: Number.isFinite(n)
+                      ? Math.min(72, Math.max(0, n))
+                      : 0,
+                  }
+                : s,
+            );
+          }}
+          style={{ maxWidth: 140 }}
+        />
       </div>
 
       <div style={{ marginTop: 16 }}>

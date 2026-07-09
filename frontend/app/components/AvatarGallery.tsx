@@ -3,6 +3,7 @@
 import qrcode from "qrcode-generator";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { BASE_PATH } from "@/lib/basePath";
+import FullscreenButton from "./FullscreenButton";
 
 // The pickup "live wall". Polls the gallery feed; shows every finished capture
 // newest-first grouped by session. A guest finds their photo, taps the top-right
@@ -57,6 +58,8 @@ export default function AvatarGallery() {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [qrUrl, setQrUrl] = useState<string | null>(null);
   const [modalPoster, setModalPoster] = useState<Poster | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState<string | null>(null);
   const timer = useRef<number | null>(null);
 
   const poll = useCallback(async () => {
@@ -104,6 +107,41 @@ export default function AvatarGallery() {
     });
   }, []);
 
+  // Permanently delete a poster from the wall (removes the gallery entry and the
+  // PNG on the bridge). Optimistically drops it from the local view.
+  const doDelete = useCallback(
+    async (id: string) => {
+      setDeleting(id);
+      try {
+        const res = await fetch(`${BASE_PATH}/api/avatar/gallery`, {
+          method: "DELETE",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ posterId: id }),
+        });
+        if (res.ok) {
+          setSets((prev) =>
+            prev
+              .map((s) => ({ ...s, posters: s.posters.filter((p) => p.id !== id) }))
+              .filter((s) => s.posters.length > 0),
+          );
+          setSelected((prev) => {
+            if (!prev.has(id)) return prev;
+            const n = new Set(prev);
+            n.delete(id);
+            return n;
+          });
+          setModalPoster((m) => (m?.id === id ? null : m));
+        }
+      } catch {
+        /* leave it; the next poll will reconcile */
+      } finally {
+        setDeleting(null);
+        setConfirmDelete(null);
+      }
+    },
+    [],
+  );
+
   const qrDataUrl = useMemo(() => {
     if (!qrUrl) return null;
     const qr = qrcode(0, "M");
@@ -123,6 +161,7 @@ export default function AvatarGallery() {
     <div className="gallery gallery--with-sidebar">
       <header className="gallery-head">
         <h1>Photo gallery</h1>
+        <FullscreenButton className="gallery-fs" />
       </header>
 
       {loaded && sets.length === 0 && (
@@ -177,6 +216,46 @@ export default function AvatarGallery() {
                     >
                       <span className="gthumb-checkmark" aria-hidden />
                     </button>
+                    <button
+                      type="button"
+                      className="gthumb-del"
+                      aria-label="Delete photo"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setConfirmDelete(p.id);
+                      }}
+                    >
+                      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                        <path d="M3 6h18" />
+                        <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                        <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+                      </svg>
+                    </button>
+                    {confirmDelete === p.id && (
+                      <div
+                        className="gthumb-confirm"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <span>Delete this photo?</span>
+                        <div className="gthumb-confirm-actions">
+                          <button
+                            type="button"
+                            className="btn btn--danger btn--sm"
+                            disabled={deleting === p.id}
+                            onClick={() => doDelete(p.id)}
+                          >
+                            {deleting === p.id ? "Deleting…" : "Delete"}
+                          </button>
+                          <button
+                            type="button"
+                            className="btn btn--ghost btn--sm"
+                            onClick={() => setConfirmDelete(null)}
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 );
               })}

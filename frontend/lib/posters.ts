@@ -1,4 +1,4 @@
-import { mkdir, writeFile, readFile } from "node:fs/promises";
+import { mkdir, writeFile, readFile, unlink } from "node:fs/promises";
 import { join } from "node:path";
 import { config } from "./config";
 
@@ -22,5 +22,15 @@ export async function readPoster(id: string): Promise<Buffer | null> {
     return await readFile(join(config.postersDir, `${sanitize(id)}.png`));
   } catch {
     return null;
+  }
+}
+
+/** Delete a poster PNG. Best-effort: returns false if it was already gone. */
+export async function deletePoster(id: string): Promise<boolean> {
+  try {
+    await unlink(join(config.postersDir, `${sanitize(id)}.png`));
+    return true;
+  } catch {
+    return false;
   }
 }

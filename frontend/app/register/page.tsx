@@ -146,7 +146,14 @@ export default function RegisterPage() {
   };
 
   return (
-    <main className="wrap">
+    <main className="cx-stage cx-stage--bottom cx-stage--opaque">
+      <div
+        className="page-bg"
+        style={{
+          ["--page-bg-url" as string]: `url("${BASE_PATH}/kelvin-bg.jpg")`,
+        }}
+        aria-hidden
+      />
       <div className="panel register-card">
         {step === "lookup" && (
           <h1 className="register-title register-title--in-card">
@@ -349,13 +356,17 @@ export default function RegisterPage() {
           </>
         )}
 
-        <FaceCapture
-          open={cameraOpen}
-          onClose={() => setCameraOpen(false)}
-          onCapture={handleCapture}
-          onError={(msg) => setError(msg)}
-        />
       </div>
+
+      {/* Rendered OUTSIDE .register-card: that card has a backdrop-filter, which
+          creates a containing block for position:fixed, so the fullscreen camera
+          would otherwise anchor to the card box instead of the viewport. */}
+      <FaceCapture
+        open={cameraOpen}
+        onClose={() => setCameraOpen(false)}
+        onCapture={handleCapture}
+        onError={(msg) => setError(msg)}
+      />
     </main>
   );
 }

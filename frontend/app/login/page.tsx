@@ -6,7 +6,7 @@ import { BASE_PATH } from "@/lib/basePath";
 
 // Operators log in here to reach /admin/* and /kiosk. The look mirrors
 // aimy_chat's security/login_page.php (gradient + grid background, glass card,
-// "Welcome Back!"). Guests never see this — they go to /early-checkin.
+// "Welcome Back!"). Guests never see this — they go to /checkin.
 // See proxy.ts for the gate and /api/login for the passphrase check.
 
 function LoginForm() {
@@ -103,7 +103,7 @@ export default function LoginPage() {
         <Suspense fallback={null}>
           <LoginForm />
         </Suspense>
-        <p className="loginFoot">Project Crow · operators only</p>
+        <p className="loginFoot">Kelvin Pah&apos;s Birthday · operators only</p>
       </div>
     </div>
   );

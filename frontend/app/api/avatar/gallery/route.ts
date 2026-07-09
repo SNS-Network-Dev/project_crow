@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { listSets } from "@/lib/gallery";
+import { listSets, removePoster } from "@/lib/gallery";
+import { deletePoster } from "@/lib/posters";
 import { BASE_PATH } from "@/lib/basePath";
 
 export const runtime = "nodejs";
@@ -25,4 +26,22 @@ export async function GET() {
       })),
     })),
   });
+}
+
+// Delete one poster from the wall: DELETE with JSON body { posterId }. Removes
+// the gallery entry and unlinks the PNG. Operator-gated (/api/avatar prefix).
+const ID_RE = /^[a-zA-Z0-9._-]{8,64}$/;
+
+export async function DELETE(request: Request) {
+  const body = (await request.json().catch(() => null)) as
+    | { posterId?: unknown }
+    | null;
+  const posterId = typeof body?.posterId === "string" ? body.posterId : "";
+  if (!ID_RE.test(posterId)) {
+    return NextResponse.json({ error: "Invalid posterId." }, { status: 400 });
+  }
+
+  const removed = await removePoster(posterId);
+  await deletePoster(posterId); // best-effort file unlink
+  return NextResponse.json({ ok: true, removed });
 }

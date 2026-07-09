@@ -1,6 +1,7 @@
 import { resolve } from "node:path";
 import { createCanvas, loadImage } from "@napi-rs/canvas";
 import type { AvatarTemplate } from "./avatarTemplate";
+import { registerPosterFonts } from "./posterFonts";
 
 // Deterministic poster compositor. Draws, in order:
 //   1. the fixed background (already contains the birthday-guy figure),
@@ -25,6 +26,7 @@ export async function composePoster(
   figure: Buffer,
   overrides: PosterOverrides = {},
 ): Promise<Buffer> {
+  registerPosterFonts(); // curated designer fonts (no-op after first call)
   const canvas = createCanvas(tpl.width, tpl.height);
   const ctx = canvas.getContext("2d");
 

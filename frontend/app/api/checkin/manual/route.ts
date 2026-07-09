@@ -1,5 +1,10 @@
 import { NextResponse } from "next/server";
-import { getPerson, latestCheckinForPerson, logCheckin } from "@/lib/db";
+import {
+  getPerson,
+  latestCheckinForPerson,
+  logCheckin,
+  type CheckinMethod,
+} from "@/lib/db";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -7,6 +12,9 @@ export const dynamic = "force-dynamic";
 export async function POST(request: Request) {
   const body = await request.json().catch(() => null);
   const personId = Number(body?.person_id);
+  // 'self' when the guest checks themselves in on /checkin; 'manual' when
+  // an operator checks them in from the admin list (the default).
+  const method: CheckinMethod = body?.method === "self" ? "self" : "manual";
 
   if (!Number.isInteger(personId) || personId <= 0) {
     return NextResponse.json(
@@ -31,8 +39,8 @@ export async function POST(request: Request) {
     });
   }
 
-  // Score 0 marks a manual (non-face) check-in.
-  await logCheckin(personId, 0);
+  // Score 0 marks a non-face check-in (manual by operator, or guest self-serve).
+  await logCheckin(personId, 0, method);
   return NextResponse.json({
     ok: true,
     name: person.name,
